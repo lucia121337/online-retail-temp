@@ -1,0 +1,670 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Online Retail BI 대시보드</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@2.0.1/dist/chartjs-chart-matrix.min.js"></script>
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --panel: #ffffff;
+    --border: #e6e9f0;
+    --ink: #1f2937;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --accent-soft: #e7efff;
+    --success: #16a34a;
+    --warn: #d97706;
+    --danger: #dc2626;
+    --shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink);
+    font-family: 'Segoe UI', 'Noto Sans KR', system-ui, -apple-system, sans-serif; }
+  header {
+    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+    color: #fff; padding: 28px 40px;
+  }
+  header h1 { margin: 0 0 6px 0; font-size: 26px; letter-spacing: -0.3px; }
+  header p { margin: 0; opacity: 0.85; font-size: 14px; }
+  main { padding: 24px 40px 60px; max-width: 1500px; margin: 0 auto; }
+  .tabs {
+    display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap;
+    background: var(--panel); padding: 8px; border-radius: 12px; border: 1px solid var(--border);
+  }
+  .tab-btn {
+    padding: 10px 18px; border-radius: 8px; border: 0; background: transparent;
+    cursor: pointer; font-size: 14px; font-weight: 600; color: var(--muted);
+    transition: all 0.15s ease;
+  }
+  .tab-btn:hover { color: var(--accent); }
+  .tab-btn.active { background: var(--accent-soft); color: var(--accent); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .kpi-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px; margin-bottom: 24px;
+  }
+  .kpi {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px 20px; box-shadow: var(--shadow);
+  }
+  .kpi .label { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi .value { font-size: 22px; font-weight: 700; margin-top: 6px; color: var(--ink); }
+  .kpi .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+  @media (max-width: 1100px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; box-shadow: var(--shadow); margin-bottom: 20px;
+  }
+  .card h3 { margin: 0 0 12px 0; font-size: 16px; color: var(--ink); }
+  .card .desc { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+  .chart-wrap { position: relative; height: 320px; }
+  .chart-wrap.tall { height: 440px; }
+  .chart-wrap.short { height: 240px; }
+  .insight {
+    background: #eff6ff; border-left: 4px solid var(--accent); padding: 12px 16px;
+    border-radius: 6px; font-size: 13.5px; margin-top: 14px; line-height: 1.55;
+  }
+  .insight.success { background: #ecfdf5; border-color: var(--success); }
+  .insight.warn { background: #fffbeb; border-color: var(--warn); }
+  table.summary { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.summary th, table.summary td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  table.summary th { background: #f8fafc; color: var(--muted); font-weight: 600; }
+  table.summary td.num, table.summary th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .controls { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .controls label { font-size: 13px; color: var(--muted); }
+  .controls select, .controls button {
+    padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+    background: #fff; font-size: 13px; cursor: pointer;
+  }
+  footer { text-align: center; padding: 24px; color: var(--muted); font-size: 12px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .badge.blue { background: #dbeafe; color: #1e40af; }
+  .badge.green { background: #d1fae5; color: #065f46; }
+  .badge.amber { background: #fef3c7; color: #92400e; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Online Retail BI 대시보드</h1>
+  <p>영국 온라인 소매업체 거래내역 · Chart.js 기반 · 단일 HTML 리포트</p>
+</header>
+
+<main>
+  <div class="tabs" id="tabs">
+    <button class="tab-btn active" data-tab="overview">개요·KPI</button>
+    <button class="tab-btn" data-tab="trend">매출 트렌드</button>
+    <button class="tab-btn" data-tab="market">글로벌 마켓</button>
+    <button class="tab-btn" data-tab="product">상품 인텔리전스</button>
+    <button class="tab-btn" data-tab="rfm">RFM 세분화</button>
+    <button class="tab-btn" data-tab="cohort">코호트 리텐션</button>
+  </div>
+
+  <!-- TAB: OVERVIEW -->
+  <section class="tab-panel active" id="overview">
+    <div class="kpi-grid" id="kpiGrid"></div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3>데이터 정제 파이프라인</h3>
+        <p class="desc">원본 대비 분석에 사용된 최종 데이터의 누적 정제 결과</p>
+        <div class="chart-wrap"><canvas id="cleanFunnel"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>주요 요약 지표</h3>
+        <p class="desc">데이터 기간 및 분석 범위</p>
+        <table class="summary" id="metaTable"></table>
+        <div class="insight">
+          <b>💡 한눈에 보기</b> · 영국 기반 업체의 1년치 거래로, 매출은 영국이 압도적이며 연말 시즌(10~11월)에 매출 피크가 형성됩니다.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB: TREND -->
+  <section class="tab-panel" id="trend">
+    <div class="card">
+      <h3>월별 매출 추이</h3>
+      <p class="desc">매출액(라인)과 주문 건수(막대)의 월별 변화. 연말 시즌 효과 확인.</p>
+      <div class="chart-wrap tall"><canvas id="monthlyChart"></canvas></div>
+      <div class="insight">
+        <b>💡 인사이트</b> · 10~11월 매출 급등은 크리스마스 시즌의 영향. 9월부터 재고 및 마케팅 캠페인 사전 준비가 효과적입니다.
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3>시간대별 주문 건수</h3>
+        <p class="desc">하루 중 주문이 집중되는 골든타임</p>
+        <div class="chart-wrap"><canvas id="hourlyChart"></canvas></div>
+        <div class="insight success">
+          <b>🚀 액션</b> · 정오(12시) 전후 주문이 최대. 10~15시 구간 CS 인력 보강 및 서버 캐파 확보 필요.
+        </div>
+      </div>
+      <div class="card">
+        <h3>요일별 매출</h3>
+        <p class="desc">요일 단위 매출 및 주문 패턴</p>
+        <div class="chart-wrap"><canvas id="dowChart"></canvas></div>
+        <div class="insight">
+          <b>💡 인사이트</b> · 주중 후반(목요일 전후) 매출이 높은 편. 토요일은 주문 자체가 적어 BtoB 비중이 큰 것으로 추정됩니다.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB: MARKET -->
+  <section class="tab-panel" id="market">
+    <div class="grid-2">
+      <div class="card">
+        <h3>국가별 매출 Top 10</h3>
+        <p class="desc">전체 매출의 국가별 분포</p>
+        <div class="chart-wrap tall"><canvas id="countryBar"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>국가별 매출 비중</h3>
+        <p class="desc">상위 10개국 + 기타 비중</p>
+        <div class="chart-wrap tall"><canvas id="countryPie"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="insight">
+        <b>💡 인사이트</b> · 영국(United Kingdom) 매출이 압도적이지만 네덜란드·아일랜드·독일·프랑스 등 EU 핵심 국가가 성장 여지가 큰 시장. 비영국권 매출 비중을 KPI로 별도 모니터링하는 것을 추천합니다.
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB: PRODUCT -->
+  <section class="tab-panel" id="product">
+    <div class="grid-2">
+      <div class="card">
+        <h3>인기 상품 Top 10 (판매 수량)</h3>
+        <p class="desc">가장 많이 팔린 SKU</p>
+        <div class="chart-wrap tall"><canvas id="topQty"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>인기 상품 Top 10 (매출 기준)</h3>
+        <p class="desc">매출 기여도 상위 SKU</p>
+        <div class="chart-wrap tall"><canvas id="topRev"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="insight success">
+        <b>🚀 액션</b> · 수량 1위 상품과 매출 1위 상품이 다르다면, 단가 인상 여지가 있는 인기 SKU와 대량 판매 SKU를 분리해 가격 전략을 운영해야 합니다. 두 차트의 교집합 상품은 핵심 효자상품으로 재고 안전수준 상향 권장.
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB: RFM -->
+  <section class="tab-panel" id="rfm">
+    <div class="grid-2">
+      <div class="card">
+        <h3>세그먼트별 고객 수</h3>
+        <p class="desc">RFM Score 기반 5개 세그먼트 분류</p>
+        <div class="chart-wrap"><canvas id="segPie"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>세그먼트별 매출 기여도</h3>
+        <p class="desc">총 Monetary 합계 (USD)</p>
+        <div class="chart-wrap"><canvas id="segRev"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>세그먼트 프로필</h3>
+      <p class="desc">고객 그룹별 평균 Recency / Frequency / Monetary</p>
+      <table class="summary" id="segTable"></table>
+    </div>
+
+    <div class="card">
+      <h3>RFM 산점도 (Frequency vs Monetary, 색=세그먼트)</h3>
+      <p class="desc">고객 1,500명 샘플. Monetary는 로그 스케일.</p>
+      <div class="chart-wrap tall"><canvas id="rfmScatter"></canvas></div>
+      <div class="insight">
+        <b>💡 인사이트</b> · 우측 상단(고빈도·고매출)에 위치한 Champions 군집은 VIP 멤버십·사전 구매 혜택 대상. 좌측 하단(저빈도·저매출)의 About to Sleep 군집은 재진입 쿠폰 캠페인이 적합합니다.
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB: COHORT -->
+  <section class="tab-panel" id="cohort">
+    <div class="card">
+      <h3>코호트 리텐션 히트맵</h3>
+      <p class="desc">첫 구매월(코호트) 기준 N개월 후 재구매율</p>
+      <div class="controls">
+        <label>표시 방식</label>
+        <select id="cohortMode">
+          <option value="rate">리텐션 비율 (%)</option>
+          <option value="count">고객 수 (명)</option>
+        </select>
+      </div>
+      <div class="chart-wrap tall"><canvas id="cohortHeat"></canvas></div>
+      <div class="insight warn">
+        <b>⚠️ 모니터링 포인트</b> · 1개월차(Index=1) 리텐션이 가장 큰 이탈 구간입니다. 첫 구매 직후 온보딩 메일과 첫 재구매 감사 쿠폰 발송으로 Index=1 리텐션을 우선 개선해야 합니다.
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>월별 신규 코호트 사이즈</h3>
+      <p class="desc">각 월의 신규 진입 고객 수</p>
+      <div class="chart-wrap"><canvas id="cohortSize"></canvas></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Online Retail BI Dashboard · Built with Chart.js · Data: online_retail.parquet
+</footer>
+
+<script>
+const DATA = {"meta": {"raw_rows": 541909, "after_customer_drop": 406829, "after_outlier_drop": 397884, "after_dedup": 392692, "date_min": "2010-12-01", "date_max": "2011-12-09"}, "kpi": {"total_revenue": 8887208.894000001, "total_orders": 18532, "unique_customers": 4338, "aov": 479.56016047917126, "total_items": 5152002, "country_count": 37, "product_count": 3665}, "monthly": {"labels": ["2010-12", "2011-01", "2011-02", "2011-03", "2011-04", "2011-05", "2011-06", "2011-07", "2011-08", "2011-09", "2011-10", "2011-11", "2011-12"], "revenue": [570422.73, 568101.31, 446084.92, 594081.76, 468374.33, 677355.15, 660046.05, 598962.9, 644051.04, 950690.2, 1035642.45, 1156205.61, 517190.44], "orders": [1400, 987, 997, 1321, 1149, 1555, 1393, 1331, 1280, 1755, 1929, 2657, 778], "customers": [885, 741, 758, 974, 856, 1056, 991, 949, 935, 1266, 1364, 1664, 615]}, "countries_top": {"labels": ["United Kingdom", "Netherlands", "EIRE", "Germany", "France", "Australia", "Spain", "Switzerland", "Belgium", "Sweden"], "revenue": [7285024.64, 285446.34, 265262.46, 228678.4, 208934.31, 138453.81, 61558.56, 56443.95, 41196.34, 38367.83], "total_revenue": 8887208.89}, "products_qty": {"labels": ["PAPER CRAFT , LITTLE BIRDIE", "MEDIUM CERAMIC TOP STORAGE JAR", "WORLD WAR 2 GLIDERS ASSTD DESIGNS", "JUMBO BAG RED RETROSPOT", "WHITE HANGING HEART T-LIGHT HOLDER", "ASSORTED COLOUR BIRD ORNAMENT", "PACK OF 72 RETROSPOT CAKE CASES", "POPCORN HOLDER", "RABBIT NIGHT LIGHT", "MINI PAINT SET VINTAGE "], "values": [80995, 77916, 54319, 46078, 36706, 35263, 33670, 30919, 27153, 26076]}, "products_rev": {"labels": ["PAPER CRAFT , LITTLE BIRDIE", "REGENCY CAKESTAND 3 TIER", "WHITE HANGING HEART T-LIGHT HOLDER", "JUMBO BAG RED RETROSPOT", "MEDIUM CERAMIC TOP STORAGE JAR", "POSTAGE", "PARTY BUNTING", "ASSORTED COLOUR BIRD ORNAMENT", "Manual", "RABBIT NIGHT LIGHT"], "values": [168469.6, 142264.75, 100392.1, 85040.54, 81416.73, 77803.96, 68785.23, 56413.03, 53419.93, 51251.24]}, "hourly": {"labels": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20], "orders": [1, 29, 555, 1393, 2226, 2277, 3130, 2636, 2274, 2037, 1100, 544, 169, 144, 18]}, "dow": {"labels": ["월", "화", "수", "목", "금", "일"], "revenue": [1363604.4, 1697733.8, 1584283.83, 1973015.73, 1483080.81, 785490.32], "orders": [2863, 3184, 3455, 4032, 2829, 2169]}, "rfm_segments": {"labels": ["About to Sleep", "At Risk", "Champions", "Loyal Customers", "New Customers"], "count": [1307, 782, 853, 1090, 306], "monetary": [364625.78, 778884.33, 5818788.0, 1825759.4, 99151.38], "avg_monetary": [278.98, 996.02, 6821.56, 1675.01, 324.02], "avg_recency": [191.9, 111.8, 11.4, 43.8, 18.5], "avg_frequency": [1.14, 2.23, 11.99, 4.25, 1.46]}, "rfm_scatter": [{"r": 53, "f": 1, "m": 131.94, "s": "About to Sleep"}, {"r": 207, "f": 2, "m": 477.79, "s": "About to Sleep"}, {"r": 17, "f": 2, "m": 1054.73, "s": "Loyal Customers"}, {"r": 8, "f": 4, "m": 1313.1, "s": "Champions"}, {"r": 111, "f": 1, "m": 1432.0, "s": "At Risk"}, {"r": 1, "f": 3, "m": 1071.73, "s": "Loyal Customers"}, {"r": 353, "f": 1, "m": 383.7, "s": "About to Sleep"}, {"r": 254, "f": 1, "m": 229.33, "s": "About to Sleep"}, {"r": 94, "f": 2, "m": 982.07, "s": "At Risk"}, {"r": 197, "f": 1, "m": 559.87, "s": "About to Sleep"}, {"r": 5, "f": 7, "m": 2533.42, "s": "Champions"}, {"r": 39, "f": 63, "m": 80850.84, "s": "Loyal Customers"}, {"r": 34, "f": 3, "m": 1122.63, "s": "Loyal Customers"}, {"r": 65, "f": 1, "m": 93.82, "s": "About to Sleep"}, {"r": 24, "f": 2, "m": 2004.3, "s": "Loyal Customers"}, {"r": 8, "f": 5, "m": 2044.87, "s": "Champions"}, {"r": 219, "f": 2, "m": 495.77, "s": "At Risk"}, {"r": 37, "f": 6, "m": 1869.82, "s": "Loyal Customers"}, {"r": 262, "f": 1, "m": 1542.08, "s": "About to Sleep"}, {"r": 206, "f": 1, "m": 157.9, "s": "About to Sleep"}, {"r": 4, "f": 17, "m": 10504.49, "s": "Champions"}, {"r": 82, "f": 3, "m": 3502.32, "s": "Loyal Customers"}, {"r": 35, "f": 2, "m": 285.89, "s": "At Risk"}, {"r": 3, "f": 8, "m": 2463.05, "s": "Champions"}, {"r": 134, "f": 3, "m": 2515.84, "s": "Loyal Customers"}, {"r": 312, "f": 1, "m": 325.75, "s": "About to Sleep"}, {"r": 28, "f": 4, "m": 3281.63, "s": "Champions"}, {"r": 30, "f": 1, "m": 439.66, "s": "New Customers"}, {"r": 32, "f": 6, "m": 2656.13, "s": "Champions"}, {"r": 68, "f": 1, "m": 415.2, "s": "About to Sleep"}, {"r": 165, "f": 2, "m": 427.64, "s": "At Risk"}, {"r": 121, "f": 2, "m": 1021.58, "s": "At Risk"}, {"r": 40, "f": 2, "m": 541.53, "s": "At Risk"}, {"r": 78, "f": 1, "m": 344.33, "s": "About to Sleep"}, {"r": 29, "f": 2, "m": 183.44, "s": "New Customers"}, {"r": 66, "f": 11, "m": 1980.57, "s": "Loyal Customers"}, {"r": 2, "f": 30, "m": 18641.01, "s": "Champions"}, {"r": 87, "f": 5, "m": 1236.54, "s": "Loyal Customers"}, {"r": 21, "f": 2, "m": 1160.07, "s": "Loyal Customers"}, {"r": 7, "f": 8, "m": 2340.84, "s": "Champions"}, {"r": 1, "f": 11, "m": 4757.16, "s": "Champions"}, {"r": 42, "f": 1, "m": 318.15, "s": "At Risk"}, {"r": 29, "f": 6, "m": 881.29, "s": "Loyal Customers"}, {"r": 267, "f": 1, "m": 183.6, "s": "About to Sleep"}, {"r": 47, "f": 3, "m": 1421.61, "s": "Loyal Customers"}, {"r": 369, "f": 1, "m": 375.69, "s": "About to Sleep"}, {"r": 12, "f": 2, "m": 302.1, "s": "Loyal Customers"}, {"r": 93, "f": 2, "m": 877.44, "s": "At Risk"}, {"r": 155, "f": 2, "m": 216.21, "s": "About to Sleep"}, {"r": 43, "f": 5, "m": 2053.02, "s": "Loyal Customers"}, {"r": 214, "f": 2, "m": 596.85, "s": "At Risk"}, {"r": 32, "f": 3, "m": 1266.97, "s": "Loyal Customers"}, {"r": 22, "f": 3, "m": 468.41, "s": "New Customers"}, {"r": 8, "f": 2, "m": 221.27, "s": "New Customers"}, {"r": 1, "f": 4, "m": 1791.56, "s": "Champions"}, {"r": 284, "f": 1, "m": 204.5, "s": "About to Sleep"}, {"r": 65, "f": 2, "m": 1025.44, "s": "Loyal Customers"}, {"r": 8, "f": 16, "m": 9227.82, "s": "Champions"}, {"r": 1, "f": 3, "m": 1316.66, "s": "Loyal Customers"}, {"r": 1, "f": 4, "m": 2027.5, "s": "Champions"}, {"r": 65, "f": 2, "m": 388.25, "s": "At Risk"}, {"r": 138, "f": 1, "m": 191.95, "s": "About to Sleep"}, {"r": 46, "f": 3, "m": 1095.08, "s": "Loyal Customers"}, {"r": 26, "f": 3, "m": 501.03, "s": "Loyal Customers"}, {"r": 22, "f": 10, "m": 2248.99, "s": "Champions"}, {"r": 360, "f": 2, "m": 365.45, "s": "About to Sleep"}, {"r": 42, "f": 3, "m": 1842.14, "s": "Loyal Customers"}, {"r": 3, "f": 55, "m": 8507.13, "s": "Champions"}, {"r": 52, "f": 6, "m": 3506.54, "s": "Loyal Customers"}, {"r": 33, "f": 1, "m": 712.78, "s": "New Customers"}, {"r": 51, "f": 2, "m": 467.51, "s": "At Risk"}, {"r": 4, "f": 15, "m": 8476.57, "s": "Champions"}, {"r": 86, "f": 1, "m": 351.65, "s": "About to Sleep"}, {"r": 243, "f": 1, "m": 185.65, "s": "About to Sleep"}, {"r": 19, "f": 2, "m": 679.45, "s": "New Customers"}, {"r": 301, "f": 1, "m": 530.15, "s": "About to Sleep"}, {"r": 43, "f": 5, "m": 5059.32, "s": "Loyal Customers"}, {"r": 7, "f": 6, "m": 1429.64, "s": "Champions"}, {"r": 80, "f": 2, "m": 701.23, "s": "At Risk"}, {"r": 78, "f": 1, "m": 301.72, "s": "About to Sleep"}, {"r": 37, "f": 2, "m": 380.39, "s": "At Risk"}, {"r": 22, "f": 2, "m": 287.62, "s": "New Customers"}, {"r": 134, "f": 2, "m": 529.73, "s": "At Risk"}, {"r": 371, "f": 1, "m": 427.8, "s": "About to Sleep"}, {"r": 30, "f": 1, "m": 349.83, "s": "New Customers"}, {"r": 8, "f": 22, "m": 26626.8, "s": "Champions"}, {"r": 248, "f": 1, "m": 123.1, "s": "About to Sleep"}, {"r": 134, "f": 1, "m": 337.44, "s": "About to Sleep"}, {"r": 48, "f": 3, "m": 478.09, "s": "At Risk"}, {"r": 15, "f": 5, "m": 1551.78, "s": "Loyal Customers"}, {"r": 34, "f": 1, "m": 210.31, "s": "About to Sleep"}, {"r": 113, "f": 4, "m": 2207.4, "s": "Loyal Customers"}, {"r": 255, "f": 2, "m": 770.12, "s": "At Risk"}, {"r": 72, "f": 2, "m": 567.36, "s": "At Risk"}, {"r": 8, "f": 6, "m": 1335.19, "s": "Champions"}, {"r": 143, "f": 2, "m": 343.23, "s": "About to Sleep"}, {"r": 26, "f": 2, "m": 595.42, "s": "Loyal Customers"}, {"r": 16, "f": 28, "m": 6295.37, "s": "Champions"}, {"r": 218, "f": 4, "m": 605.8, "s": "At Risk"}, {"r": 8, "f": 3, "m": 2081.9, "s": "Champions"}, {"r": 29, "f": 13, "m": 4396.13, "s": "Champions"}, {"r": 36, "f": 3, "m": 1290.53, "s": "Loyal Customers"}, {"r": 11, "f": 1, "m": 213.96, "s": "New Customers"}, {"r": 59, "f": 6, "m": 3160.0, "s": "Loyal Customers"}, {"r": 24, "f": 1, "m": 376.72, "s": "New Customers"}, {"r": 227, "f": 2, "m": 1998.0, "s": "At Risk"}, {"r": 32, "f": 2, "m": 714.96, "s": "Loyal Customers"}, {"r": 240, "f": 1, "m": 623.5, "s": "About to Sleep"}, {"r": 73, "f": 5, "m": 1674.69, "s": "Loyal Customers"}, {"r": 4, "f": 9, "m": 1002.9, "s": "Champions"}, {"r": 36, "f": 1, "m": 372.7, "s": "About to Sleep"}, {"r": 84, "f": 2, "m": 777.53, "s": "At Risk"}, {"r": 29, "f": 2, "m": 333.48, "s": "New Customers"}, {"r": 189, "f": 1, "m": 349.1, "s": "About to Sleep"}, {"r": 109, "f": 4, "m": 1116.68, "s": "Loyal Customers"}, {"r": 326, "f": 1, "m": 201.16, "s": "About to Sleep"}, {"r": 24, "f": 4, "m": 720.86, "s": "Loyal Customers"}, {"r": 7, "f": 10, "m": 6761.34, "s": "Champions"}, {"r": 64, "f": 5, "m": 3099.72, "s": "Loyal Customers"}, {"r": 71, "f": 1, "m": 743.53, "s": "At Risk"}, {"r": 313, "f": 2, "m": 580.05, "s": "At Risk"}, {"r": 15, "f": 4, "m": 519.69, "s": "Loyal Customers"}, {"r": 11, "f": 10, "m": 3466.28, "s": "Champions"}, {"r": 3, "f": 4, "m": 1839.3, "s": "Champions"}, {"r": 82, "f": 1, "m": 345.0, "s": "About to Sleep"}, {"r": 15, "f": 4, "m": 1504.27, "s": "Loyal Customers"}, {"r": 33, "f": 1, "m": 134.46, "s": "About to Sleep"}, {"r": 80, "f": 2, "m": 797.71, "s": "At Risk"}, {"r": 60, "f": 3, "m": 2128.42, "s": "Loyal Customers"}, {"r": 13, "f": 4, "m": 859.71, "s": "Loyal Customers"}, {"r": 108, "f": 3, "m": 422.47, "s": "At Risk"}, {"r": 34, "f": 6, "m": 1449.32, "s": "Loyal Customers"}, {"r": 265, "f": 1, "m": 138.68, "s": "About to Sleep"}, {"r": 115, "f": 2, "m": 605.06, "s": "At Risk"}, {"r": 13, "f": 4, "m": 1353.74, "s": "Champions"}, {"r": 53, "f": 4, "m": 1344.78, "s": "Loyal Customers"}, {"r": 81, "f": 1, "m": 242.35, "s": "About to Sleep"}, {"r": 16, "f": 3, "m": 656.69, "s": "Loyal Customers"}, {"r": 9, "f": 5, "m": 1072.36, "s": "Champions"}, {"r": 53, "f": 5, "m": 2092.66, "s": "Loyal Customers"}, {"r": 56, "f": 5, "m": 2607.61, "s": "Loyal Customers"}, {"r": 115, "f": 3, "m": 817.86, "s": "At Risk"}, {"r": 35, "f": 4, "m": 916.98, "s": "Loyal Customers"}, {"r": 52, "f": 4, "m": 752.77, "s": "Loyal Customers"}, {"r": 191, "f": 1, "m": 346.98, "s": "About to Sleep"}, {"r": 92, "f": 2, "m": 716.35, "s": "At Risk"}, {"r": 205, "f": 2, "m": 483.8, "s": "About to Sleep"}, {"r": 28, "f": 7, "m": 1582.8, "s": "Champions"}, {"r": 49, "f": 10, "m": 4020.04, "s": "Loyal Customers"}, {"r": 1, "f": 13, "m": 5855.57, "s": "Champions"}, {"r": 3, "f": 7, "m": 1341.6, "s": "Champions"}, {"r": 5, "f": 5, "m": 1987.33, "s": "Champions"}, {"r": 5, "f": 2, "m": 271.19, "s": "Loyal Customers"}, {"r": 326, "f": 1, "m": 216.07, "s": "About to Sleep"}, {"r": 31, "f": 5, "m": 2647.59, "s": "Champions"}, {"r": 255, "f": 1, "m": 56.4, "s": "About to Sleep"}, {"r": 8, "f": 2, "m": 869.77, "s": "Loyal Customers"}, {"r": 29, "f": 7, "m": 2213.13, "s": "Champions"}, {"r": 74, "f": 2, "m": 551.04, "s": "At Risk"}, {"r": 51, "f": 12, "m": 5049.95, "s": "Loyal Customers"}, {"r": 93, "f": 3, "m": 379.35, "s": "At Risk"}, {"r": 12, "f": 4, "m": 650.43, "s": "Loyal Customers"}, {"r": 56, "f": 4, "m": 783.97, "s": "Loyal Customers"}, {"r": 89, "f": 1, "m": 103.3, "s": "About to Sleep"}, {"r": 5, "f": 4, "m": 1031.41, "s": "Champions"}, {"r": 72, "f": 4, "m": 2232.49, "s": "Loyal Customers"}, {"r": 8, "f": 2, "m": 497.56, "s": "Loyal Customers"}, {"r": 174, "f": 2, "m": 513.7, "s": "At Risk"}, {"r": 1, "f": 11, "m": 4462.68, "s": "Champions"}, {"r": 320, "f": 1, "m": 206.98, "s": "About to Sleep"}, {"r": 50, "f": 3, "m": 903.9, "s": "Loyal Customers"}, {"r": 18, "f": 3, "m": 6748.8, "s": "Champions"}, {"r": 82, "f": 1, "m": 1043.1, "s": "At Risk"}, {"r": 71, "f": 3, "m": 1519.42, "s": "Loyal Customers"}, {"r": 265, "f": 1, "m": 172.9, "s": "About to Sleep"}, {"r": 267, "f": 2, "m": 409.98, "s": "About to Sleep"}, {"r": 11, "f": 1, "m": 279.05, "s": "New Customers"}, {"r": 17, "f": 4, "m": 1945.33, "s": "Loyal Customers"}, {"r": 15, "f": 1, "m": 271.2, "s": "New Customers"}, {"r": 218, "f": 1, "m": 265.2, "s": "About to Sleep"}, {"r": 318, "f": 1, "m": 302.58, "s": "About to Sleep"}, {"r": 45, "f": 1, "m": 178.34, "s": "About to Sleep"}, {"r": 364, "f": 1, "m": 256.32, "s": "About to Sleep"}, {"r": 288, "f": 3, "m": 702.0, "s": "At Risk"}, {"r": 116, "f": 1, "m": 1706.88, "s": "At Risk"}, {"r": 24, "f": 3, "m": 4628.75, "s": "Loyal Customers"}, {"r": 251, "f": 1, "m": 127.84, "s": "About to Sleep"}, {"r": 85, "f": 1, "m": 211.32, "s": "About to Sleep"}, {"r": 129, "f": 1, "m": 168.0, "s": "About to Sleep"}, {"r": 173, "f": 1, "m": 187.05, "s": "About to Sleep"}, {"r": 277, "f": 2, "m": 149.64, "s": "About to Sleep"}, {"r": 261, "f": 1, "m": 154.95, "s": "About to Sleep"}, {"r": 295, "f": 1, "m": 307.4, "s": "About to Sleep"}, {"r": 242, "f": 1, "m": 135.19, "s": "About to Sleep"}, {"r": 136, "f": 1, "m": 60.7, "s": "About to Sleep"}, {"r": 194, "f": 1, "m": 240.89, "s": "About to Sleep"}, {"r": 94, "f": 4, "m": 1037.59, "s": "Loyal Customers"}, {"r": 186, "f": 3, "m": 710.28, "s": "At Risk"}, {"r": 4, "f": 10, "m": 2000.86, "s": "Champions"}, {"r": 60, "f": 2, "m": 643.9, "s": "At Risk"}, {"r": 136, "f": 2, "m": 752.6, "s": "At Risk"}, {"r": 12, "f": 8, "m": 3146.92, "s": "Champions"}, {"r": 41, "f": 5, "m": 1105.78, "s": "Loyal Customers"}, {"r": 155, "f": 2, "m": 187.29, "s": "About to Sleep"}, {"r": 4, "f": 1, "m": 90.04, "s": "New Customers"}, {"r": 17, "f": 8, "m": 5859.43, "s": "Champions"}, {"r": 163, "f": 1, "m": 110.92, "s": "About to Sleep"}, {"r": 309, "f": 2, "m": 693.33, "s": "About to Sleep"}, {"r": 133, "f": 2, "m": 397.29, "s": "At Risk"}, {"r": 9, "f": 6, "m": 1064.07, "s": "Champions"}, {"r": 1, "f": 91, "m": 60632.75, "s": "Champions"}, {"r": 23, "f": 1, "m": 444.68, "s": "New Customers"}, {"r": 4, "f": 9, "m": 2108.06, "s": "Champions"}, {"r": 16, "f": 8, "m": 1502.86, "s": "Champions"}, {"r": 33, "f": 2, "m": 355.73, "s": "New Customers"}, {"r": 44, "f": 1, "m": 221.97, "s": "About to Sleep"}, {"r": 81, "f": 2, "m": 810.57, "s": "At Risk"}, {"r": 17, "f": 1, "m": 138.6, "s": "About to Sleep"}, {"r": 86, "f": 4, "m": 1793.58, "s": "Loyal Customers"}, {"r": 8, "f": 44, "m": 51527.3, "s": "Champions"}, {"r": 131, "f": 1, "m": 1089.18, "s": "At Risk"}, {"r": 18, "f": 5, "m": 1422.52, "s": "Loyal Customers"}, {"r": 96, "f": 2, "m": 913.19, "s": "At Risk"}, {"r": 23, "f": 3, "m": 568.55, "s": "Loyal Customers"}, {"r": 50, "f": 2, "m": 599.56, "s": "At Risk"}, {"r": 2, "f": 26, "m": 8004.92, "s": "Champions"}, {"r": 103, "f": 4, "m": 417.06, "s": "At Risk"}, {"r": 11, "f": 1, "m": 546.04, "s": "Loyal Customers"}, {"r": 2, "f": 5, "m": 1581.84, "s": "Champions"}, {"r": 18, "f": 5, "m": 1515.9, "s": "Loyal Customers"}, {"r": 374, "f": 1, "m": 489.6, "s": "About to Sleep"}, {"r": 166, "f": 4, "m": 803.54, "s": "At Risk"}, {"r": 288, "f": 1, "m": 1340.32, "s": "About to Sleep"}, {"r": 2, "f": 124, "m": 40519.84, "s": "Champions"}, {"r": 187, "f": 1, "m": 124.57, "s": "About to Sleep"}, {"r": 17, "f": 2, "m": 192.6, "s": "New Customers"}, {"r": 13, "f": 7, "m": 1328.35, "s": "Champions"}, {"r": 11, "f": 4, "m": 745.06, "s": "Loyal Customers"}, {"r": 236, "f": 1, "m": 175.27, "s": "About to Sleep"}, {"r": 71, "f": 6, "m": 2059.45, "s": "Loyal Customers"}, {"r": 27, "f": 5, "m": 920.51, "s": "Loyal Customers"}, {"r": 43, "f": 3, "m": 12601.83, "s": "Loyal Customers"}, {"r": 10, "f": 4, "m": 420.3, "s": "Loyal Customers"}, {"r": 9, "f": 2, "m": 1020.42, "s": "Loyal Customers"}, {"r": 232, "f": 1, "m": 139.35, "s": "About to Sleep"}, {"r": 61, "f": 3, "m": 990.2, "s": "Loyal Customers"}, {"r": 369, "f": 1, "m": 606.05, "s": "About to Sleep"}, {"r": 22, "f": 3, "m": 648.89, "s": "Loyal Customers"}, {"r": 7, "f": 2, "m": 584.07, "s": "Loyal Customers"}, {"r": 192, "f": 4, "m": 517.53, "s": "At Risk"}, {"r": 45, "f": 2, "m": 664.26, "s": "At Risk"}, {"r": 131, "f": 3, "m": 675.6, "s": "At Risk"}, {"r": 214, "f": 1, "m": 459.4, "s": "About to Sleep"}, {"r": 112, "f": 5, "m": 404.58, "s": "At Risk"}, {"r": 283, "f": 1, "m": 417.2, "s": "About to Sleep"}, {"r": 22, "f": 8, "m": 984.91, "s": "Champions"}, {"r": 235, "f": 2, "m": 280.55, "s": "About to Sleep"}, {"r": 110, "f": 1, "m": 548.12, "s": "At Risk"}, {"r": 284, "f": 1, "m": 158.68, "s": "About to Sleep"}, {"r": 45, "f": 1, "m": 229.64, "s": "About to Sleep"}, {"r": 191, "f": 1, "m": 133.56, "s": "About to Sleep"}, {"r": 12, "f": 10, "m": 3945.0, "s": "Champions"}, {"r": 23, "f": 5, "m": 981.51, "s": "Loyal Customers"}, {"r": 19, "f": 3, "m": 635.41, "s": "Loyal Customers"}, {"r": 72, "f": 1, "m": 224.14, "s": "About to Sleep"}, {"r": 22, "f": 1, "m": 110.46, "s": "About to Sleep"}, {"r": 239, "f": 1, "m": 116.01, "s": "About to Sleep"}, {"r": 21, "f": 2, "m": 2794.51, "s": "Loyal Customers"}, {"r": 50, "f": 4, "m": 1425.67, "s": "Loyal Customers"}, {"r": 46, "f": 2, "m": 698.41, "s": "At Risk"}, {"r": 50, "f": 2, "m": 272.04, "s": "At Risk"}, {"r": 11, "f": 3, "m": 2720.63, "s": "Champions"}, {"r": 43, "f": 3, "m": 1837.28, "s": "Loyal Customers"}, {"r": 148, "f": 3, "m": 2103.06, "s": "Loyal Customers"}, {"r": 24, "f": 3, "m": 1174.58, "s": "Loyal Customers"}, {"r": 123, "f": 2, "m": 804.02, "s": "At Risk"}, {"r": 303, "f": 1, "m": 205.48, "s": "About to Sleep"}, {"r": 108, "f": 2, "m": 1135.04, "s": "At Risk"}, {"r": 78, "f": 3, "m": 1126.85, "s": "At Risk"}, {"r": 22, "f": 4, "m": 4067.29, "s": "Champions"}, {"r": 158, "f": 2, "m": 416.08, "s": "About to Sleep"}, {"r": 26, "f": 3, "m": 1213.16, "s": "Loyal Customers"}, {"r": 2, "f": 11, "m": 3883.25, "s": "Champions"}, {"r": 23, "f": 2, "m": 503.76, "s": "New Customers"}, {"r": 3, "f": 4, "m": 915.13, "s": "Loyal Customers"}, {"r": 159, "f": 2, "m": 665.78, "s": "At Risk"}, {"r": 143, "f": 1, "m": 329.65, "s": "About to Sleep"}, {"r": 98, "f": 3, "m": 529.62, "s": "At Risk"}, {"r": 264, "f": 1, "m": 226.21, "s": "About to Sleep"}, {"r": 9, "f": 10, "m": 2588.77, "s": "Champions"}, {"r": 180, "f": 1, "m": 236.26, "s": "About to Sleep"}, {"r": 19, "f": 1, "m": 170.32, "s": "About to Sleep"}, {"r": 2, "f": 2, "m": 396.48, "s": "Loyal Customers"}, {"r": 17, "f": 2, "m": 529.41, "s": "Loyal Customers"}, {"r": 32, "f": 9, "m": 1843.83, "s": "Champions"}, {"r": 190, "f": 1, "m": 296.7, "s": "About to Sleep"}, {"r": 1, "f": 1, "m": 848.55, "s": "New Customers"}, {"r": 311, "f": 1, "m": 364.6, "s": "About to Sleep"}, {"r": 6, "f": 4, "m": 594.52, "s": "Loyal Customers"}, {"r": 239, "f": 2, "m": 511.36, "s": "About to Sleep"}, {"r": 315, "f": 2, "m": 779.57, "s": "About to Sleep"}, {"r": 22, "f": 2, "m": 618.09, "s": "Loyal Customers"}, {"r": 75, "f": 4, "m": 322.41, "s": "At Risk"}, {"r": 192, "f": 1, "m": 228.8, "s": "About to Sleep"}, {"r": 59, "f": 4, "m": 1113.02, "s": "Loyal Customers"}, {"r": 373, "f": 1, "m": 106.2, "s": "About to Sleep"}, {"r": 7, "f": 8, "m": 4331.48, "s": "Champions"}, {"r": 19, "f": 6, "m": 939.32, "s": "Champions"}, {"r": 61, "f": 2, "m": 422.64, "s": "At Risk"}, {"r": 203, "f": 1, "m": 585.12, "s": "About to Sleep"}, {"r": 154, "f": 2, "m": 322.96, "s": "At Risk"}, {"r": 24, "f": 3, "m": 564.62, "s": "Loyal Customers"}, {"r": 57, "f": 2, "m": 245.81, "s": "At Risk"}, {"r": 309, "f": 1, "m": 393.49, "s": "About to Sleep"}, {"r": 18, "f": 3, "m": 1132.14, "s": "Loyal Customers"}, {"r": 20, "f": 18, "m": 7354.62, "s": "Champions"}, {"r": 362, "f": 1, "m": 157.92, "s": "About to Sleep"}, {"r": 113, "f": 1, "m": 612.29, "s": "About to Sleep"}, {"r": 134, "f": 1, "m": 25.5, "s": "About to Sleep"}, {"r": 200, "f": 1, "m": 339.6, "s": "About to Sleep"}, {"r": 25, "f": 1, "m": 205.25, "s": "New Customers"}, {"r": 273, "f": 1, "m": 516.42, "s": "About to Sleep"}, {"r": 15, "f": 1, "m": 183.02, "s": "About to Sleep"}, {"r": 8, "f": 21, "m": 5579.1, "s": "Champions"}, {"r": 3, "f": 5, "m": 1651.03, "s": "Champions"}, {"r": 16, "f": 8, "m": 1906.09, "s": "Champions"}, {"r": 205, "f": 1, "m": 171.45, "s": "About to Sleep"}, {"r": 17, "f": 13, "m": 4730.81, "s": "Champions"}, {"r": 277, "f": 1, "m": 325.1, "s": "About to Sleep"}, {"r": 27, "f": 5, "m": 2720.8, "s": "Champions"}, {"r": 86, "f": 1, "m": 679.68, "s": "About to Sleep"}, {"r": 211, "f": 2, "m": 9864.26, "s": "At Risk"}, {"r": 88, "f": 4, "m": 2726.23, "s": "Loyal Customers"}, {"r": 22, "f": 1, "m": 177.31, "s": "About to Sleep"}, {"r": 61, "f": 1, "m": 499.32, "s": "At Risk"}, {"r": 64, "f": 4, "m": 1060.56, "s": "Loyal Customers"}, {"r": 17, "f": 1, "m": 196.94, "s": "About to Sleep"}, {"r": 1, "f": 23, "m": 15610.39, "s": "Champions"}, {"r": 47, "f": 1, "m": 255.9, "s": "About to Sleep"}, {"r": 128, "f": 3, "m": 982.42, "s": "At Risk"}, {"r": 24, "f": 12, "m": 18895.91, "s": "Champions"}, {"r": 31, "f": 11, "m": 3170.98, "s": "Champions"}, {"r": 189, "f": 1, "m": 39.12, "s": "About to Sleep"}, {"r": 16, "f": 4, "m": 775.96, "s": "Loyal Customers"}, {"r": 128, "f": 3, "m": 408.59, "s": "At Risk"}, {"r": 11, "f": 3, "m": 797.96, "s": "Loyal Customers"}, {"r": 115, "f": 3, "m": 653.38, "s": "At Risk"}, {"r": 66, "f": 2, "m": 574.07, "s": "At Risk"}, {"r": 200, "f": 3, "m": 1396.99, "s": "At Risk"}, {"r": 64, "f": 1, "m": 439.56, "s": "About to Sleep"}, {"r": 147, "f": 1, "m": 358.56, "s": "About to Sleep"}, {"r": 33, "f": 3, "m": 980.31, "s": "Loyal Customers"}, {"r": 38, "f": 6, "m": 1454.58, "s": "Loyal Customers"}, {"r": 95, "f": 1, "m": 82.75, "s": "About to Sleep"}, {"r": 3, "f": 5, "m": 1662.3, "s": "Champions"}, {"r": 90, "f": 3, "m": 3756.33, "s": "Loyal Customers"}, {"r": 29, "f": 10, "m": 2599.04, "s": "Champions"}, {"r": 236, "f": 1, "m": 151.85, "s": "About to Sleep"}, {"r": 67, "f": 3, "m": 705.12, "s": "Loyal Customers"}, {"r": 130, "f": 3, "m": 1685.46, "s": "Loyal Customers"}, {"r": 64, "f": 1, "m": 221.06, "s": "About to Sleep"}, {"r": 24, "f": 2, "m": 328.4, "s": "New Customers"}, {"r": 1, "f": 10, "m": 3641.32, "s": "Champions"}, {"r": 16, "f": 14, "m": 16209.5, "s": "Champions"}, {"r": 26, "f": 7, "m": 1049.06, "s": "Champions"}, {"r": 31, "f": 6, "m": 2461.24, "s": "Champions"}, {"r": 19, "f": 10, "m": 2467.99, "s": "Champions"}, {"r": 5, "f": 2, "m": 640.83, "s": "Loyal Customers"}, {"r": 1, "f": 5, "m": 1245.9, "s": "Champions"}, {"r": 132, "f": 3, "m": 2375.41, "s": "Loyal Customers"}, {"r": 65, "f": 1, "m": 90.6, "s": "About to Sleep"}, {"r": 372, "f": 1, "m": 39.75, "s": "About to Sleep"}, {"r": 338, "f": 2, "m": 401.9, "s": "About to Sleep"}, {"r": 9, "f": 34, "m": 16594.35, "s": "Champions"}, {"r": 64, "f": 4, "m": 2634.45, "s": "Loyal Customers"}, {"r": 5, "f": 6, "m": 400.86, "s": "Loyal Customers"}, {"r": 99, "f": 3, "m": 1019.76, "s": "At Risk"}, {"r": 60, "f": 1, "m": 200.14, "s": "About to Sleep"}, {"r": 57, "f": 2, "m": 239.92, "s": "At Risk"}, {"r": 82, "f": 4, "m": 559.59, "s": "At Risk"}, {"r": 96, "f": 2, "m": 678.16, "s": "At Risk"}, {"r": 3, "f": 1, "m": 124.2, "s": "New Customers"}, {"r": 17, "f": 51, "m": 34684.4, "s": "Champions"}, {"r": 60, "f": 1, "m": 397.12, "s": "About to Sleep"}, {"r": 155, "f": 1, "m": 308.58, "s": "About to Sleep"}, {"r": 184, "f": 2, "m": 251.21, "s": "About to Sleep"}, {"r": 12, "f": 1, "m": 433.86, "s": "New Customers"}, {"r": 26, "f": 3, "m": 808.44, "s": "Loyal Customers"}, {"r": 150, "f": 1, "m": 610.01, "s": "At Risk"}, {"r": 113, "f": 1, "m": 288.18, "s": "About to Sleep"}, {"r": 71, "f": 1, "m": 74.4, "s": "About to Sleep"}, {"r": 50, "f": 1, "m": 157.05, "s": "About to Sleep"}, {"r": 11, "f": 26, "m": 5625.08, "s": "Champions"}, {"r": 178, "f": 2, "m": 674.52, "s": "At Risk"}, {"r": 40, "f": 1, "m": 166.2, "s": "About to Sleep"}, {"r": 11, "f": 4, "m": 1643.18, "s": "Champions"}, {"r": 218, "f": 1, "m": 76.32, "s": "About to Sleep"}, {"r": 120, "f": 2, "m": 254.1, "s": "At Risk"}, {"r": 78, "f": 1, "m": 432.2, "s": "About to Sleep"}, {"r": 360, "f": 1, "m": 422.7, "s": "About to Sleep"}, {"r": 96, "f": 5, "m": 948.25, "s": "Loyal Customers"}, {"r": 11, "f": 8, "m": 3603.29, "s": "Champions"}, {"r": 358, "f": 2, "m": 1660.9, "s": "At Risk"}, {"r": 11, "f": 4, "m": 450.84, "s": "Loyal Customers"}, {"r": 3, "f": 7, "m": 1616.8, "s": "Champions"}, {"r": 326, "f": 1, "m": 155.93, "s": "About to Sleep"}, {"r": 16, "f": 3, "m": 745.52, "s": "Loyal Customers"}, {"r": 373, "f": 1, "m": 311.81, "s": "About to Sleep"}, {"r": 313, "f": 1, "m": 559.61, "s": "About to Sleep"}, {"r": 22, "f": 1, "m": 133.4, "s": "About to Sleep"}, {"r": 18, "f": 4, "m": 2020.4, "s": "Loyal Customers"}, {"r": 24, "f": 3, "m": 1413.66, "s": "Loyal Customers"}, {"r": 71, "f": 2, "m": 947.4, "s": "At Risk"}, {"r": 364, "f": 1, "m": 311.95, "s": "About to Sleep"}, {"r": 33, "f": 2, "m": 659.41, "s": "New Customers"}, {"r": 4, "f": 13, "m": 2790.95, "s": "Champions"}, {"r": 93, "f": 1, "m": 121.74, "s": "About to Sleep"}, {"r": 5, "f": 4, "m": 1195.9, "s": "Champions"}, {"r": 149, "f": 2, "m": 653.3, "s": "At Risk"}, {"r": 29, "f": 2, "m": 621.75, "s": "Loyal Customers"}, {"r": 299, "f": 2, "m": 289.78, "s": "About to Sleep"}, {"r": 20, "f": 1, "m": 198.8, "s": "New Customers"}, {"r": 9, "f": 5, "m": 4708.86, "s": "Champions"}, {"r": 150, "f": 4, "m": 295.0, "s": "At Risk"}, {"r": 247, "f": 2, "m": 632.4, "s": "At Risk"}, {"r": 3, "f": 19, "m": 4521.49, "s": "Champions"}, {"r": 4, "f": 2, "m": 239.76, "s": "New Customers"}, {"r": 3, "f": 19, "m": 2612.96, "s": "Champions"}, {"r": 11, "f": 19, "m": 33643.08, "s": "Champions"}, {"r": 47, "f": 6, "m": 1611.59, "s": "Loyal Customers"}, {"r": 288, "f": 1, "m": 462.95, "s": "About to Sleep"}, {"r": 32, "f": 3, "m": 931.02, "s": "Loyal Customers"}, {"r": 267, "f": 1, "m": 676.2, "s": "About to Sleep"}, {"r": 11, "f": 7, "m": 2638.94, "s": "Champions"}, {"r": 6, "f": 3, "m": 663.81, "s": "Loyal Customers"}, {"r": 228, "f": 1, "m": 205.7, "s": "About to Sleep"}, {"r": 75, "f": 1, "m": 254.28, "s": "About to Sleep"}, {"r": 18, "f": 6, "m": 8438.34, "s": "Champions"}, {"r": 191, "f": 2, "m": 617.05, "s": "At Risk"}, {"r": 2, "f": 22, "m": 10611.72, "s": "Champions"}, {"r": 30, "f": 15, "m": 4726.8, "s": "Champions"}, {"r": 276, "f": 1, "m": 380.5, "s": "About to Sleep"}, {"r": 255, "f": 1, "m": 277.07, "s": "About to Sleep"}, {"r": 4, "f": 1, "m": 41.99, "s": "New Customers"}, {"r": 353, "f": 1, "m": 1141.24, "s": "At Risk"}, {"r": 96, "f": 1, "m": 205.3, "s": "About to Sleep"}, {"r": 158, "f": 1, "m": 487.02, "s": "About to Sleep"}, {"r": 288, "f": 1, "m": 741.26, "s": "About to Sleep"}, {"r": 82, "f": 3, "m": 1179.89, "s": "Loyal Customers"}, {"r": 362, "f": 1, "m": 135.4, "s": "About to Sleep"}, {"r": 4, "f": 10, "m": 1951.97, "s": "Champions"}, {"r": 24, "f": 17, "m": 6211.66, "s": "Champions"}, {"r": 10, "f": 1, "m": 218.75, "s": "New Customers"}, {"r": 36, "f": 15, "m": 6419.95, "s": "Loyal Customers"}, {"r": 38, "f": 3, "m": 646.83, "s": "Loyal Customers"}, {"r": 24, "f": 1, "m": 160.19, "s": "About to Sleep"}, {"r": 260, "f": 1, "m": 335.32, "s": "About to Sleep"}, {"r": 239, "f": 2, "m": 312.23, "s": "About to Sleep"}, {"r": 281, "f": 2, "m": 3811.95, "s": "At Risk"}, {"r": 32, "f": 3, "m": 869.28, "s": "Loyal Customers"}, {"r": 115, "f": 1, "m": 185.9, "s": "About to Sleep"}, {"r": 157, "f": 2, "m": 1030.4, "s": "At Risk"}, {"r": 355, "f": 1, "m": 193.64, "s": "About to Sleep"}, {"r": 9, "f": 6, "m": 621.68, "s": "Champions"}, {"r": 121, "f": 13, "m": 3675.77, "s": "Loyal Customers"}, {"r": 212, "f": 1, "m": 1031.07, "s": "About to Sleep"}, {"r": 79, "f": 6, "m": 877.56, "s": "Loyal Customers"}, {"r": 358, "f": 1, "m": 540.45, "s": "About to Sleep"}, {"r": 2, "f": 19, "m": 13110.02, "s": "Champions"}, {"r": 44, "f": 2, "m": 792.11, "s": "At Risk"}, {"r": 2, "f": 2, "m": 439.92, "s": "Loyal Customers"}, {"r": 3, "f": 8, "m": 2097.88, "s": "Champions"}, {"r": 127, "f": 1, "m": 62.64, "s": "About to Sleep"}, {"r": 141, "f": 4, "m": 601.27, "s": "At Risk"}, {"r": 117, "f": 1, "m": 508.46, "s": "At Risk"}, {"r": 8, "f": 5, "m": 2357.68, "s": "Champions"}, {"r": 134, "f": 2, "m": 408.36, "s": "At Risk"}, {"r": 104, "f": 4, "m": 618.09, "s": "At Risk"}, {"r": 12, "f": 3, "m": 1067.75, "s": "Loyal Customers"}, {"r": 1, "f": 8, "m": 1859.31, "s": "Champions"}, {"r": 17, "f": 8, "m": 6493.54, "s": "Champions"}, {"r": 38, "f": 5, "m": 1098.43, "s": "Loyal Customers"}, {"r": 35, "f": 3, "m": 798.74, "s": "Loyal Customers"}, {"r": 50, "f": 1, "m": 427.7, "s": "About to Sleep"}, {"r": 59, "f": 9, "m": 3385.62, "s": "Loyal Customers"}, {"r": 24, "f": 14, "m": 4416.26, "s": "Champions"}, {"r": 225, "f": 1, "m": 314.22, "s": "About to Sleep"}, {"r": 313, "f": 1, "m": 382.5, "s": "About to Sleep"}, {"r": 287, "f": 1, "m": 189.9, "s": "About to Sleep"}, {"r": 11, "f": 27, "m": 3787.6, "s": "Champions"}, {"r": 186, "f": 6, "m": 1607.06, "s": "Loyal Customers"}, {"r": 107, "f": 3, "m": 1314.45, "s": "At Risk"}, {"r": 212, "f": 1, "m": 348.15, "s": "About to Sleep"}, {"r": 77, "f": 1, "m": 363.65, "s": "About to Sleep"}, {"r": 81, "f": 2, "m": 490.86, "s": "At Risk"}, {"r": 106, "f": 2, "m": 383.75, "s": "At Risk"}, {"r": 237, "f": 3, "m": 630.84, "s": "At Risk"}, {"r": 366, "f": 1, "m": 254.03, "s": "About to Sleep"}, {"r": 50, "f": 1, "m": 214.32, "s": "About to Sleep"}, {"r": 16, "f": 5, "m": 1870.97, "s": "Loyal Customers"}, {"r": 28, "f": 1, "m": 162.22, "s": "New Customers"}, {"r": 4, "f": 13, "m": 4051.48, "s": "Champions"}, {"r": 50, "f": 8, "m": 1980.56, "s": "Loyal Customers"}, {"r": 1, "f": 4, "m": 3590.41, "s": "Champions"}, {"r": 30, "f": 5, "m": 2188.05, "s": "Champions"}, {"r": 35, "f": 3, "m": 557.94, "s": "At Risk"}, {"r": 18, "f": 6, "m": 3789.52, "s": "Champions"}, {"r": 15, "f": 8, "m": 1657.28, "s": "Champions"}, {"r": 53, "f": 1, "m": 204.24, "s": "About to Sleep"}, {"r": 11, "f": 4, "m": 1006.8, "s": "Champions"}, {"r": 22, "f": 2, "m": 268.05, "s": "New Customers"}, {"r": 11, "f": 25, "m": 4748.52, "s": "Champions"}, {"r": 305, "f": 1, "m": 141.92, "s": "About to Sleep"}, {"r": 262, "f": 1, "m": 77.3, "s": "About to Sleep"}, {"r": 12, "f": 2, "m": 461.19, "s": "Loyal Customers"}, {"r": 74, "f": 2, "m": 558.7, "s": "At Risk"}, {"r": 38, "f": 3, "m": 1247.69, "s": "Loyal Customers"}, {"r": 74, "f": 1, "m": 1033.34, "s": "At Risk"}, {"r": 48, "f": 12, "m": 4331.79, "s": "Loyal Customers"}, {"r": 3, "f": 26, "m": 12627.94, "s": "Champions"}, {"r": 57, "f": 2, "m": 225.85, "s": "At Risk"}, {"r": 54, "f": 3, "m": 700.63, "s": "Loyal Customers"}, {"r": 14, "f": 2, "m": 523.11, "s": "Loyal Customers"}, {"r": 2, "f": 3, "m": 734.37, "s": "Loyal Customers"}, {"r": 56, "f": 1, "m": 81.57, "s": "About to Sleep"}, {"r": 66, "f": 8, "m": 1702.26, "s": "Loyal Customers"}, {"r": 74, "f": 3, "m": 572.45, "s": "At Risk"}, {"r": 22, "f": 2, "m": 126.25, "s": "New Customers"}, {"r": 50, "f": 6, "m": 2965.69, "s": "Loyal Customers"}, {"r": 64, "f": 1, "m": 122.7, "s": "About to Sleep"}, {"r": 17, "f": 8, "m": 2552.21, "s": "Champions"}, {"r": 23, "f": 3, "m": 840.21, "s": "Loyal Customers"}, {"r": 87, "f": 4, "m": 2106.84, "s": "Loyal Customers"}, {"r": 78, "f": 1, "m": 122.75, "s": "About to Sleep"}, {"r": 1, "f": 3, "m": 640.76, "s": "Loyal Customers"}, {"r": 87, "f": 1, "m": 563.15, "s": "About to Sleep"}, {"r": 145, "f": 4, "m": 1484.06, "s": "Loyal Customers"}, {"r": 43, "f": 7, "m": 1280.85, "s": "Loyal Customers"}, {"r": 10, "f": 47, "m": 19766.59, "s": "Champions"}, {"r": 239, "f": 1, "m": 139.05, "s": "About to Sleep"}, {"r": 3, "f": 8, "m": 1465.51, "s": "Champions"}, {"r": 9, "f": 11, "m": 3611.31, "s": "Champions"}, {"r": 239, "f": 2, "m": 416.86, "s": "About to Sleep"}, {"r": 4, "f": 2, "m": 178.96, "s": "New Customers"}, {"r": 79, "f": 5, "m": 2247.41, "s": "Loyal Customers"}, {"r": 201, "f": 1, "m": 178.39, "s": "About to Sleep"}, {"r": 253, "f": 1, "m": 151.5, "s": "About to Sleep"}, {"r": 177, "f": 1, "m": 46.95, "s": "About to Sleep"}, {"r": 373, "f": 2, "m": 256.44, "s": "About to Sleep"}, {"r": 151, "f": 2, "m": 652.8, "s": "At Risk"}, {"r": 190, "f": 1, "m": 232.21, "s": "About to Sleep"}, {"r": 101, "f": 3, "m": 455.59, "s": "At Risk"}, {"r": 21, "f": 5, "m": 2795.33, "s": "Champions"}, {"r": 206, "f": 1, "m": 1384.25, "s": "About to Sleep"}, {"r": 81, "f": 1, "m": 52.83, "s": "About to Sleep"}, {"r": 267, "f": 1, "m": 152.55, "s": "About to Sleep"}, {"r": 18, "f": 4, "m": 701.4, "s": "Loyal Customers"}, {"r": 8, "f": 10, "m": 1652.18, "s": "Champions"}, {"r": 23, "f": 6, "m": 21429.39, "s": "Champions"}, {"r": 135, "f": 2, "m": 653.35, "s": "At Risk"}, {"r": 74, "f": 6, "m": 5976.79, "s": "Loyal Customers"}, {"r": 19, "f": 1, "m": 327.3, "s": "New Customers"}, {"r": 60, "f": 3, "m": 84.65, "s": "At Risk"}, {"r": 25, "f": 9, "m": 1600.86, "s": "Champions"}, {"r": 192, "f": 1, "m": 309.54, "s": "About to Sleep"}, {"r": 273, "f": 2, "m": 1145.6, "s": "At Risk"}, {"r": 2, "f": 11, "m": 9068.26, "s": "Champions"}, {"r": 45, "f": 3, "m": 1320.95, "s": "Loyal Customers"}, {"r": 15, "f": 3, "m": 450.41, "s": "Loyal Customers"}, {"r": 12, "f": 10, "m": 3124.72, "s": "Champions"}, {"r": 29, "f": 2, "m": 585.27, "s": "New Customers"}, {"r": 74, "f": 2, "m": 245.94, "s": "About to Sleep"}, {"r": 22, "f": 2, "m": 418.68, "s": "New Customers"}, {"r": 71, "f": 3, "m": 536.68, "s": "Loyal Customers"}, {"r": 4, "f": 6, "m": 2274.14, "s": "Champions"}, {"r": 149, "f": 1, "m": 309.4, "s": "About to Sleep"}, {"r": 11, "f": 4, "m": 1797.78, "s": "Champions"}, {"r": 67, "f": 1, "m": 890.85, "s": "At Risk"}, {"r": 312, "f": 1, "m": 316.26, "s": "About to Sleep"}, {"r": 20, "f": 1, "m": 225.36, "s": "About to Sleep"}, {"r": 3, "f": 20, "m": 8694.26, "s": "Champions"}, {"r": 11, "f": 7, "m": 4478.53, "s": "Champions"}, {"r": 68, "f": 3, "m": 2511.69, "s": "Loyal Customers"}, {"r": 14, "f": 1, "m": 100.9, "s": "About to Sleep"}, {"r": 283, "f": 1, "m": 559.12, "s": "About to Sleep"}, {"r": 5, "f": 3, "m": 2134.01, "s": "Champions"}, {"r": 1, "f": 60, "m": 259657.3, "s": "Champions"}, {"r": 25, "f": 1, "m": 655.58, "s": "New Customers"}, {"r": 13, "f": 10, "m": 2079.68, "s": "Champions"}, {"r": 75, "f": 2, "m": 675.8, "s": "At Risk"}, {"r": 11, "f": 1, "m": 247.32, "s": "New Customers"}, {"r": 141, "f": 2, "m": 160.35, "s": "About to Sleep"}, {"r": 127, "f": 4, "m": 740.94, "s": "At Risk"}, {"r": 172, "f": 1, "m": 290.36, "s": "About to Sleep"}, {"r": 172, "f": 1, "m": 475.86, "s": "About to Sleep"}, {"r": 23, "f": 2, "m": 511.35, "s": "Loyal Customers"}, {"r": 12, "f": 3, "m": 1259.43, "s": "Loyal Customers"}, {"r": 2, "f": 2, "m": 490.33, "s": "Loyal Customers"}, {"r": 241, "f": 1, "m": 246.04, "s": "About to Sleep"}, {"r": 303, "f": 1, "m": 84.3, "s": "About to Sleep"}, {"r": 32, "f": 1, "m": 151.04, "s": "About to Sleep"}, {"r": 87, "f": 2, "m": 758.92, "s": "At Risk"}, {"r": 158, "f": 1, "m": 289.96, "s": "About to Sleep"}, {"r": 63, "f": 1, "m": 1714.96, "s": "At Risk"}, {"r": 120, "f": 4, "m": 1340.7, "s": "Loyal Customers"}, {"r": 365, "f": 1, "m": 458.92, "s": "About to Sleep"}, {"r": 67, "f": 1, "m": 426.63, "s": "At Risk"}, {"r": 139, "f": 3, "m": 4599.42, "s": "Loyal Customers"}, {"r": 149, "f": 2, "m": 2209.85, "s": "At Risk"}, {"r": 134, "f": 3, "m": 1390.5, "s": "At Risk"}, {"r": 163, "f": 4, "m": 1594.23, "s": "Loyal Customers"}, {"r": 65, "f": 3, "m": 414.04, "s": "At Risk"}, {"r": 319, "f": 1, "m": 106.83, "s": "About to Sleep"}, {"r": 45, "f": 3, "m": 335.03, "s": "At Risk"}, {"r": 219, "f": 1, "m": 203.87, "s": "About to Sleep"}, {"r": 311, "f": 1, "m": 35.8, "s": "About to Sleep"}, {"r": 2, "f": 11, "m": 4196.01, "s": "Champions"}, {"r": 213, "f": 1, "m": 426.6, "s": "About to Sleep"}, {"r": 227, "f": 2, "m": 632.07, "s": "At Risk"}, {"r": 2, "f": 10, "m": 1863.76, "s": "Champions"}, {"r": 95, "f": 6, "m": 3100.09, "s": "Loyal Customers"}, {"r": 25, "f": 1, "m": 394.38, "s": "New Customers"}, {"r": 20, "f": 6, "m": 4147.96, "s": "Champions"}, {"r": 46, "f": 2, "m": 1021.48, "s": "At Risk"}, {"r": 67, "f": 2, "m": 1269.1, "s": "At Risk"}, {"r": 21, "f": 1, "m": 166.08, "s": "New Customers"}, {"r": 201, "f": 2, "m": 218.25, "s": "About to Sleep"}, {"r": 1, "f": 7, "m": 2092.32, "s": "Champions"}, {"r": 50, "f": 2, "m": 173.16, "s": "At Risk"}, {"r": 19, "f": 1, "m": 297.0, "s": "New Customers"}, {"r": 188, "f": 2, "m": 729.54, "s": "About to Sleep"}, {"r": 41, "f": 2, "m": 920.1, "s": "At Risk"}, {"r": 4, "f": 1, "m": 329.36, "s": "New Customers"}, {"r": 258, "f": 2, "m": 453.0, "s": "About to Sleep"}, {"r": 212, "f": 3, "m": 816.73, "s": "At Risk"}, {"r": 1, "f": 7, "m": 1926.65, "s": "Champions"}, {"r": 22, "f": 1, "m": 151.5, "s": "About to Sleep"}, {"r": 23, "f": 4, "m": 414.76, "s": "Loyal Customers"}, {"r": 10, "f": 9, "m": 4642.57, "s": "Champions"}, {"r": 18, "f": 1, "m": 178.26, "s": "New Customers"}, {"r": 65, "f": 1, "m": 312.98, "s": "About to Sleep"}, {"r": 25, "f": 8, "m": 2527.92, "s": "Champions"}, {"r": 178, "f": 2, "m": 833.78, "s": "At Risk"}, {"r": 4, "f": 13, "m": 9785.97, "s": "Champions"}, {"r": 7, "f": 2, "m": 3192.54, "s": "Loyal Customers"}, {"r": 155, "f": 2, "m": 315.06, "s": "At Risk"}, {"r": 24, "f": 1, "m": 598.73, "s": "New Customers"}, {"r": 333, "f": 1, "m": 110.95, "s": "About to Sleep"}, {"r": 59, "f": 9, "m": 2332.15, "s": "Loyal Customers"}, {"r": 72, "f": 2, "m": 225.58, "s": "At Risk"}, {"r": 366, "f": 1, "m": 403.25, "s": "About to Sleep"}, {"r": 309, "f": 1, "m": 475.37, "s": "About to Sleep"}, {"r": 64, "f": 2, "m": 272.07, "s": "At Risk"}, {"r": 260, "f": 1, "m": 409.57, "s": "About to Sleep"}, {"r": 157, "f": 2, "m": 1019.52, "s": "At Risk"}, {"r": 351, "f": 1, "m": 300.42, "s": "About to Sleep"}, {"r": 289, "f": 1, "m": 145.92, "s": "About to Sleep"}, {"r": 104, "f": 8, "m": 1852.67, "s": "Loyal Customers"}, {"r": 2, "f": 4, "m": 2291.19, "s": "Champions"}, {"r": 25, "f": 2, "m": 578.9, "s": "Loyal Customers"}, {"r": 5, "f": 4, "m": 874.59, "s": "Loyal Customers"}, {"r": 18, "f": 9, "m": 1540.42, "s": "Champions"}, {"r": 21, "f": 12, "m": 1927.32, "s": "Champions"}, {"r": 207, "f": 1, "m": 369.2, "s": "About to Sleep"}, {"r": 15, "f": 3, "m": 4188.0, "s": "Loyal Customers"}, {"r": 367, "f": 1, "m": 145.93, "s": "About to Sleep"}, {"r": 25, "f": 1, "m": 161.64, "s": "About to Sleep"}, {"r": 192, "f": 1, "m": 457.34, "s": "About to Sleep"}, {"r": 30, "f": 4, "m": 1824.37, "s": "Loyal Customers"}, {"r": 27, "f": 14, "m": 1964.3, "s": "Champions"}, {"r": 29, "f": 1, "m": 363.2, "s": "New Customers"}, {"r": 120, "f": 2, "m": 712.29, "s": "At Risk"}, {"r": 29, "f": 3, "m": 1567.48, "s": "Loyal Customers"}, {"r": 313, "f": 1, "m": 112.75, "s": "About to Sleep"}, {"r": 133, "f": 1, "m": 76.5, "s": "About to Sleep"}, {"r": 21, "f": 8, "m": 716.0, "s": "Loyal Customers"}, {"r": 30, "f": 8, "m": 5891.61, "s": "Champions"}, {"r": 100, "f": 3, "m": 1200.62, "s": "Loyal Customers"}, {"r": 30, "f": 3, "m": 981.18, "s": "Loyal Customers"}, {"r": 3, "f": 2, "m": 606.91, "s": "Loyal Customers"}, {"r": 13, "f": 10, "m": 3957.43, "s": "Champions"}, {"r": 64, "f": 1, "m": 6.2, "s": "About to Sleep"}, {"r": 253, "f": 1, "m": 257.23, "s": "About to Sleep"}, {"r": 163, "f": 12, "m": 5719.82, "s": "Loyal Customers"}, {"r": 30, "f": 10, "m": 2712.91, "s": "Champions"}, {"r": 19, "f": 2, "m": 1189.59, "s": "Loyal Customers"}, {"r": 11, "f": 2, "m": 222.4, "s": "New Customers"}, {"r": 25, "f": 3, "m": 1013.26, "s": "Loyal Customers"}, {"r": 72, "f": 2, "m": 283.47, "s": "At Risk"}, {"r": 69, "f": 1, "m": 270.8, "s": "At Risk"}, {"r": 161, "f": 4, "m": 225.26, "s": "At Risk"}, {"r": 9, "f": 9, "m": 2993.1, "s": "Champions"}, {"r": 163, "f": 3, "m": 1516.24, "s": "At Risk"}, {"r": 5, "f": 22, "m": 8347.2, "s": "Champions"}, {"r": 13, "f": 4, "m": 2861.55, "s": "Champions"}, {"r": 185, "f": 2, "m": 152.4, "s": "About to Sleep"}, {"r": 107, "f": 1, "m": 534.31, "s": "At Risk"}, {"r": 16, "f": 7, "m": 2064.95, "s": "Champions"}, {"r": 66, "f": 2, "m": 466.73, "s": "At Risk"}, {"r": 46, "f": 4, "m": 1048.28, "s": "Loyal Customers"}, {"r": 6, "f": 2, "m": 163.62, "s": "New Customers"}, {"r": 243, "f": 1, "m": 560.67, "s": "About to Sleep"}, {"r": 5, "f": 18, "m": 6680.11, "s": "Champions"}, {"r": 22, "f": 4, "m": 2724.81, "s": "Champions"}, {"r": 286, "f": 1, "m": 65.13, "s": "About to Sleep"}, {"r": 9, "f": 1, "m": 353.27, "s": "New Customers"}, {"r": 11, "f": 4, "m": 1258.08, "s": "Champions"}, {"r": 141, "f": 3, "m": 207.74, "s": "At Risk"}, {"r": 2, "f": 32, "m": 4124.69, "s": "Champions"}, {"r": 15, "f": 2, "m": 500.42, "s": "Loyal Customers"}, {"r": 25, "f": 4, "m": 867.38, "s": "Loyal Customers"}, {"r": 54, "f": 4, "m": 1420.2, "s": "Loyal Customers"}, {"r": 3, "f": 2, "m": 399.19, "s": "Loyal Customers"}, {"r": 203, "f": 2, "m": 172.29, "s": "About to Sleep"}, {"r": 176, "f": 1, "m": 189.5, "s": "About to Sleep"}, {"r": 16, "f": 5, "m": 1427.57, "s": "Loyal Customers"}, {"r": 22, "f": 2, "m": 486.69, "s": "New Customers"}, {"r": 80, "f": 2, "m": 7829.89, "s": "At Risk"}, {"r": 9, "f": 37, "m": 16587.09, "s": "Champions"}, {"r": 2, "f": 13, "m": 4684.76, "s": "Champions"}, {"r": 124, "f": 6, "m": 1175.38, "s": "Loyal Customers"}, {"r": 51, "f": 1, "m": 480.38, "s": "About to Sleep"}, {"r": 155, "f": 2, "m": 333.97, "s": "At Risk"}, {"r": 75, "f": 2, "m": 621.29, "s": "At Risk"}, {"r": 43, "f": 7, "m": 4582.64, "s": "Loyal Customers"}, {"r": 12, "f": 3, "m": 849.06, "s": "Loyal Customers"}, {"r": 75, "f": 3, "m": 1226.88, "s": "At Risk"}, {"r": 373, "f": 1, "m": 38.1, "s": "About to Sleep"}, {"r": 23, "f": 11, "m": 5655.99, "s": "Champions"}, {"r": 40, "f": 5, "m": 2178.67, "s": "Loyal Customers"}, {"r": 31, "f": 2, "m": 703.36, "s": "Loyal Customers"}, {"r": 92, "f": 3, "m": 1255.0, "s": "At Risk"}, {"r": 264, "f": 1, "m": 298.11, "s": "About to Sleep"}, {"r": 28, "f": 1, "m": 345.82, "s": "New Customers"}, {"r": 304, "f": 1, "m": 133.35, "s": "About to Sleep"}, {"r": 59, "f": 2, "m": 376.64, "s": "At Risk"}, {"r": 1, "f": 41, "m": 16225.39, "s": "Champions"}, {"r": 315, "f": 2, "m": 1628.12, "s": "At Risk"}, {"r": 52, "f": 5, "m": 1253.36, "s": "Loyal Customers"}, {"r": 44, "f": 11, "m": 5228.05, "s": "Loyal Customers"}, {"r": 74, "f": 1, "m": 704.04, "s": "About to Sleep"}, {"r": 35, "f": 5, "m": 2062.7, "s": "Loyal Customers"}, {"r": 178, "f": 4, "m": 675.64, "s": "At Risk"}, {"r": 47, "f": 3, "m": 380.02, "s": "At Risk"}, {"r": 18, "f": 2, "m": 971.74, "s": "Loyal Customers"}, {"r": 14, "f": 7, "m": 1771.2, "s": "Champions"}, {"r": 165, "f": 3, "m": 316.11, "s": "At Risk"}, {"r": 4, "f": 23, "m": 26879.04, "s": "Champions"}, {"r": 46, "f": 1, "m": 130.74, "s": "About to Sleep"}, {"r": 66, "f": 2, "m": 195.55, "s": "About to Sleep"}, {"r": 78, "f": 2, "m": 1013.04, "s": "At Risk"}, {"r": 20, "f": 3, "m": 1298.66, "s": "Loyal Customers"}, {"r": 244, "f": 1, "m": 110.97, "s": "About to Sleep"}, {"r": 268, "f": 1, "m": 333.74, "s": "About to Sleep"}, {"r": 72, "f": 1, "m": 957.97, "s": "At Risk"}, {"r": 260, "f": 1, "m": 361.54, "s": "About to Sleep"}, {"r": 8, "f": 2, "m": 657.16, "s": "Loyal Customers"}, {"r": 372, "f": 1, "m": 321.79, "s": "About to Sleep"}, {"r": 43, "f": 1, "m": 225.12, "s": "About to Sleep"}, {"r": 232, "f": 2, "m": 876.42, "s": "At Risk"}, {"r": 138, "f": 3, "m": 881.07, "s": "At Risk"}, {"r": 78, "f": 2, "m": 1090.24, "s": "At Risk"}, {"r": 23, "f": 11, "m": 4257.82, "s": "Champions"}, {"r": 52, "f": 3, "m": 3049.88, "s": "Loyal Customers"}, {"r": 10, "f": 2, "m": 77.4, "s": "New Customers"}, {"r": 323, "f": 1, "m": 225.6, "s": "About to Sleep"}, {"r": 71, "f": 1, "m": 283.55, "s": "About to Sleep"}, {"r": 19, "f": 1, "m": 43.2, "s": "About to Sleep"}, {"r": 185, "f": 1, "m": 307.72, "s": "About to Sleep"}, {"r": 8, "f": 4, "m": 1281.32, "s": "Champions"}, {"r": 192, "f": 1, "m": 324.92, "s": "About to Sleep"}, {"r": 8, "f": 3, "m": 711.86, "s": "Loyal Customers"}, {"r": 18, "f": 4, "m": 986.48, "s": "Loyal Customers"}, {"r": 310, "f": 1, "m": 349.27, "s": "About to Sleep"}, {"r": 45, "f": 2, "m": 1186.35, "s": "Loyal Customers"}, {"r": 10, "f": 13, "m": 4745.69, "s": "Champions"}, {"r": 44, "f": 2, "m": 355.05, "s": "At Risk"}, {"r": 32, "f": 10, "m": 3237.54, "s": "Champions"}, {"r": 43, "f": 2, "m": 770.03, "s": "At Risk"}, {"r": 9, "f": 3, "m": 553.44, "s": "Loyal Customers"}, {"r": 8, "f": 7, "m": 2154.97, "s": "Champions"}, {"r": 130, "f": 4, "m": 1475.81, "s": "Loyal Customers"}, {"r": 23, "f": 3, "m": 1384.86, "s": "Loyal Customers"}, {"r": 30, "f": 1, "m": 91.68, "s": "About to Sleep"}, {"r": 31, "f": 4, "m": 1066.15, "s": "Loyal Customers"}, {"r": 310, "f": 5, "m": 310.06, "s": "At Risk"}, {"r": 311, "f": 6, "m": 319.5, "s": "At Risk"}, {"r": 72, "f": 1, "m": 379.14, "s": "At Risk"}, {"r": 10, "f": 4, "m": 869.46, "s": "Loyal Customers"}, {"r": 5, "f": 5, "m": 1257.68, "s": "Champions"}, {"r": 157, "f": 3, "m": 350.82, "s": "At Risk"}, {"r": 150, "f": 2, "m": 159.85, "s": "About to Sleep"}, {"r": 10, "f": 6, "m": 1122.36, "s": "Champions"}, {"r": 8, "f": 16, "m": 3352.96, "s": "Champions"}, {"r": 318, "f": 1, "m": 773.55, "s": "About to Sleep"}, {"r": 15, "f": 9, "m": 6868.29, "s": "Champions"}, {"r": 41, "f": 8, "m": 965.16, "s": "Loyal Customers"}, {"r": 22, "f": 5, "m": 5112.96, "s": "Champions"}, {"r": 4, "f": 1, "m": 120.03, "s": "New Customers"}, {"r": 36, "f": 2, "m": 517.36, "s": "At Risk"}, {"r": 49, "f": 3, "m": 488.2, "s": "Loyal Customers"}, {"r": 214, "f": 1, "m": 109.13, "s": "About to Sleep"}, {"r": 29, "f": 7, "m": 2272.4, "s": "Champions"}, {"r": 326, "f": 1, "m": 440.0, "s": "About to Sleep"}, {"r": 151, "f": 3, "m": 2744.03, "s": "Loyal Customers"}, {"r": 4, "f": 2, "m": 1068.87, "s": "Loyal Customers"}, {"r": 94, "f": 3, "m": 234.6, "s": "About to Sleep"}, {"r": 71, "f": 2, "m": 1631.77, "s": "Loyal Customers"}, {"r": 260, "f": 1, "m": 602.63, "s": "About to Sleep"}, {"r": 78, "f": 4, "m": 1532.2, "s": "Loyal Customers"}, {"r": 3, "f": 9, "m": 3649.1, "s": "Champions"}, {"r": 29, "f": 4, "m": 697.55, "s": "Loyal Customers"}, {"r": 28, "f": 1, "m": 191.04, "s": "About to Sleep"}, {"r": 262, "f": 1, "m": 200.16, "s": "About to Sleep"}, {"r": 66, "f": 1, "m": 406.53, "s": "About to Sleep"}, {"r": 18, "f": 4, "m": 501.12, "s": "Loyal Customers"}, {"r": 219, "f": 3, "m": 1008.39, "s": "At Risk"}, {"r": 36, "f": 1, "m": 524.14, "s": "At Risk"}, {"r": 175, "f": 4, "m": 1564.56, "s": "Loyal Customers"}, {"r": 30, "f": 1, "m": 112.4, "s": "New Customers"}, {"r": 134, "f": 1, "m": 375.0, "s": "About to Sleep"}, {"r": 10, "f": 1, "m": 201.78, "s": "New Customers"}, {"r": 270, "f": 1, "m": 140.54, "s": "About to Sleep"}, {"r": 92, "f": 3, "m": 711.41, "s": "At Risk"}, {"r": 23, "f": 11, "m": 3962.6, "s": "Champions"}, {"r": 16, "f": 2, "m": 215.48, "s": "New Customers"}, {"r": 34, "f": 4, "m": 781.91, "s": "Loyal Customers"}, {"r": 88, "f": 7, "m": 2005.63, "s": "Loyal Customers"}, {"r": 10, "f": 3, "m": 1298.66, "s": "Loyal Customers"}, {"r": 355, "f": 1, "m": 290.51, "s": "About to Sleep"}, {"r": 170, "f": 1, "m": 179.93, "s": "About to Sleep"}, {"r": 29, "f": 3, "m": 547.0, "s": "Loyal Customers"}, {"r": 13, "f": 8, "m": 4767.36, "s": "Champions"}, {"r": 58, "f": 4, "m": 6310.03, "s": "Loyal Customers"}, {"r": 29, "f": 3, "m": 1071.99, "s": "Loyal Customers"}, {"r": 64, "f": 1, "m": 427.6, "s": "About to Sleep"}, {"r": 64, "f": 1, "m": 2626.3, "s": "At Risk"}, {"r": 2, "f": 11, "m": 3586.03, "s": "Champions"}, {"r": 95, "f": 2, "m": 686.63, "s": "At Risk"}, {"r": 201, "f": 2, "m": 300.95, "s": "About to Sleep"}, {"r": 3, "f": 5, "m": 787.85, "s": "Loyal Customers"}, {"r": 11, "f": 5, "m": 1614.31, "s": "Champions"}, {"r": 225, "f": 1, "m": 331.18, "s": "About to Sleep"}, {"r": 198, "f": 2, "m": 695.61, "s": "At Risk"}, {"r": 64, "f": 8, "m": 2938.91, "s": "Loyal Customers"}, {"r": 65, "f": 1, "m": 328.65, "s": "At Risk"}, {"r": 30, "f": 6, "m": 1456.96, "s": "Champions"}, {"r": 34, "f": 1, "m": 230.51, "s": "About to Sleep"}, {"r": 1, "f": 17, "m": 3251.79, "s": "Champions"}, {"r": 318, "f": 1, "m": 99.5, "s": "About to Sleep"}, {"r": 117, "f": 2, "m": 348.91, "s": "At Risk"}, {"r": 52, "f": 1, "m": 110.8, "s": "About to Sleep"}, {"r": 24, "f": 2, "m": 596.1, "s": "Loyal Customers"}, {"r": 29, "f": 2, "m": 302.57, "s": "New Customers"}, {"r": 4, "f": 27, "m": 16143.64, "s": "Champions"}, {"r": 1, "f": 35, "m": 7436.93, "s": "Champions"}, {"r": 60, "f": 2, "m": 675.69, "s": "At Risk"}, {"r": 333, "f": 3, "m": 2184.42, "s": "Loyal Customers"}, {"r": 11, "f": 2, "m": 757.37, "s": "Loyal Customers"}, {"r": 207, "f": 1, "m": 463.38, "s": "About to Sleep"}, {"r": 264, "f": 1, "m": 267.18, "s": "About to Sleep"}, {"r": 22, "f": 25, "m": 7930.54, "s": "Champions"}, {"r": 123, "f": 2, "m": 1142.42, "s": "At Risk"}, {"r": 36, "f": 3, "m": 841.08, "s": "Loyal Customers"}, {"r": 8, "f": 2, "m": 955.24, "s": "Loyal Customers"}, {"r": 4, "f": 12, "m": 1535.77, "s": "Champions"}, {"r": 186, "f": 1, "m": 103.25, "s": "About to Sleep"}, {"r": 234, "f": 1, "m": 150.3, "s": "About to Sleep"}, {"r": 212, "f": 2, "m": 2683.82, "s": "At Risk"}, {"r": 120, "f": 1, "m": 252.1, "s": "About to Sleep"}, {"r": 3, "f": 4, "m": 1286.7, "s": "Champions"}, {"r": 219, "f": 2, "m": 610.59, "s": "About to Sleep"}, {"r": 13, "f": 2, "m": 675.64, "s": "Loyal Customers"}, {"r": 4, "f": 17, "m": 65164.79, "s": "Champions"}, {"r": 41, "f": 5, "m": 867.31, "s": "Loyal Customers"}, {"r": 107, "f": 5, "m": 428.18, "s": "At Risk"}, {"r": 23, "f": 3, "m": 972.08, "s": "Loyal Customers"}, {"r": 5, "f": 5, "m": 1019.27, "s": "Champions"}, {"r": 57, "f": 5, "m": 1555.34, "s": "Loyal Customers"}, {"r": 3, "f": 15, "m": 3701.44, "s": "Champions"}, {"r": 57, "f": 4, "m": 1877.59, "s": "Loyal Customers"}, {"r": 185, "f": 2, "m": 154.83, "s": "About to Sleep"}, {"r": 61, "f": 1, "m": 104.82, "s": "About to Sleep"}, {"r": 2, "f": 12, "m": 1865.89, "s": "Champions"}, {"r": 35, "f": 3, "m": 626.6, "s": "At Risk"}, {"r": 18, "f": 6, "m": 2022.81, "s": "Champions"}, {"r": 30, "f": 6, "m": 882.24, "s": "Loyal Customers"}, {"r": 30, "f": 2, "m": 372.22, "s": "New Customers"}, {"r": 25, "f": 4, "m": 2883.54, "s": "Champions"}, {"r": 41, "f": 2, "m": 291.48, "s": "At Risk"}, {"r": 8, "f": 2, "m": 178.05, "s": "New Customers"}, {"r": 57, "f": 3, "m": 1621.88, "s": "Loyal Customers"}, {"r": 79, "f": 5, "m": 2634.26, "s": "Loyal Customers"}, {"r": 93, "f": 4, "m": 678.25, "s": "At Risk"}, {"r": 117, "f": 4, "m": 588.13, "s": "At Risk"}, {"r": 373, "f": 1, "m": 487.75, "s": "About to Sleep"}, {"r": 5, "f": 2, "m": 610.52, "s": "Loyal Customers"}, {"r": 58, "f": 1, "m": 187.83, "s": "About to Sleep"}, {"r": 148, "f": 2, "m": 581.23, "s": "At Risk"}, {"r": 42, "f": 2, "m": 463.46, "s": "At Risk"}, {"r": 78, "f": 1, "m": 777.2, "s": "About to Sleep"}, {"r": 362, "f": 1, "m": 418.92, "s": "About to Sleep"}, {"r": 38, "f": 2, "m": 389.27, "s": "At Risk"}, {"r": 27, "f": 2, "m": 761.74, "s": "Loyal Customers"}, {"r": 36, "f": 1, "m": 308.94, "s": "About to Sleep"}, {"r": 53, "f": 2, "m": 1992.11, "s": "Loyal Customers"}, {"r": 51, "f": 1, "m": 386.43, "s": "About to Sleep"}, {"r": 373, "f": 1, "m": 303.97, "s": "About to Sleep"}, {"r": 23, "f": 1, "m": 223.85, "s": "About to Sleep"}, {"r": 18, "f": 2, "m": 251.7, "s": "New Customers"}, {"r": 310, "f": 1, "m": 558.32, "s": "About to Sleep"}, {"r": 290, "f": 1, "m": 574.02, "s": "About to Sleep"}, {"r": 13, "f": 3, "m": 554.85, "s": "Loyal Customers"}, {"r": 138, "f": 1, "m": 868.49, "s": "At Risk"}, {"r": 59, "f": 3, "m": 855.45, "s": "Loyal Customers"}, {"r": 147, "f": 3, "m": 483.73, "s": "At Risk"}, {"r": 17, "f": 18, "m": 7324.09, "s": "Champions"}, {"r": 40, "f": 2, "m": 1399.92, "s": "Loyal Customers"}, {"r": 147, "f": 1, "m": 1220.77, "s": "At Risk"}, {"r": 4, "f": 2, "m": 226.47, "s": "New Customers"}, {"r": 70, "f": 1, "m": 310.62, "s": "About to Sleep"}, {"r": 372, "f": 1, "m": 50.55, "s": "About to Sleep"}, {"r": 93, "f": 4, "m": 2106.52, "s": "Loyal Customers"}, {"r": 31, "f": 7, "m": 2588.39, "s": "Champions"}, {"r": 64, "f": 1, "m": 295.93, "s": "About to Sleep"}, {"r": 9, "f": 2, "m": 922.53, "s": "Loyal Customers"}, {"r": 18, "f": 6, "m": 1720.3, "s": "Champions"}, {"r": 106, "f": 1, "m": 725.64, "s": "About to Sleep"}, {"r": 9, "f": 9, "m": 12669.98, "s": "Champions"}, {"r": 26, "f": 2, "m": 1247.61, "s": "Loyal Customers"}, {"r": 134, "f": 1, "m": 358.82, "s": "About to Sleep"}, {"r": 7, "f": 2, "m": 334.48, "s": "Loyal Customers"}, {"r": 26, "f": 2, "m": 289.99, "s": "New Customers"}, {"r": 16, "f": 1, "m": 220.62, "s": "New Customers"}, {"r": 53, "f": 2, "m": 860.41, "s": "At Risk"}, {"r": 33, "f": 2, "m": 191.99, "s": "New Customers"}, {"r": 106, "f": 1, "m": 343.36, "s": "About to Sleep"}, {"r": 50, "f": 5, "m": 1824.23, "s": "Loyal Customers"}, {"r": 373, "f": 1, "m": 161.0, "s": "About to Sleep"}, {"r": 9, "f": 25, "m": 8109.52, "s": "Champions"}, {"r": 9, "f": 3, "m": 1333.68, "s": "Loyal Customers"}, {"r": 80, "f": 1, "m": 768.24, "s": "About to Sleep"}, {"r": 76, "f": 1, "m": 272.22, "s": "About to Sleep"}, {"r": 284, "f": 1, "m": 94.05, "s": "About to Sleep"}, {"r": 58, "f": 2, "m": 2218.02, "s": "Loyal Customers"}, {"r": 65, "f": 1, "m": 91.85, "s": "About to Sleep"}, {"r": 74, "f": 1, "m": 104.35, "s": "About to Sleep"}, {"r": 12, "f": 6, "m": 852.88, "s": "Champions"}, {"r": 25, "f": 3, "m": 682.91, "s": "Loyal Customers"}, {"r": 2, "f": 6, "m": 1838.85, "s": "Champions"}, {"r": 239, "f": 1, "m": 328.16, "s": "About to Sleep"}, {"r": 54, "f": 1, "m": 119.62, "s": "About to Sleep"}, {"r": 16, "f": 5, "m": 1875.86, "s": "Loyal Customers"}, {"r": 212, "f": 2, "m": 1522.75, "s": "At Risk"}, {"r": 22, "f": 2, "m": 293.1, "s": "New Customers"}, {"r": 144, "f": 3, "m": 1724.67, "s": "At Risk"}, {"r": 263, "f": 1, "m": 15.0, "s": "About to Sleep"}, {"r": 31, "f": 2, "m": 510.71, "s": "Loyal Customers"}, {"r": 242, "f": 1, "m": 183.85, "s": "About to Sleep"}, {"r": 78, "f": 1, "m": 118.8, "s": "About to Sleep"}, {"r": 59, "f": 4, "m": 950.36, "s": "Loyal Customers"}, {"r": 75, "f": 1, "m": 420.5, "s": "About to Sleep"}, {"r": 169, "f": 7, "m": 3703.29, "s": "Loyal Customers"}, {"r": 11, "f": 1, "m": 527.2, "s": "New Customers"}, {"r": 17, "f": 2, "m": 338.62, "s": "New Customers"}, {"r": 22, "f": 1, "m": 631.35, "s": "New Customers"}, {"r": 127, "f": 3, "m": 1009.6, "s": "Loyal Customers"}, {"r": 40, "f": 4, "m": 1366.86, "s": "Loyal Customers"}, {"r": 64, "f": 1, "m": 600.39, "s": "At Risk"}, {"r": 14, "f": 2, "m": 2906.85, "s": "Loyal Customers"}, {"r": 4, "f": 7, "m": 1974.65, "s": "Champions"}, {"r": 148, "f": 2, "m": 1063.46, "s": "At Risk"}, {"r": 17, "f": 4, "m": 5578.72, "s": "Champions"}, {"r": 204, "f": 1, "m": 59.8, "s": "About to Sleep"}, {"r": 234, "f": 1, "m": 409.4, "s": "About to Sleep"}, {"r": 12, "f": 7, "m": 2962.5, "s": "Champions"}, {"r": 370, "f": 2, "m": 152.88, "s": "About to Sleep"}, {"r": 17, "f": 4, "m": 808.87, "s": "Loyal Customers"}, {"r": 143, "f": 1, "m": 451.42, "s": "About to Sleep"}, {"r": 90, "f": 2, "m": 584.5, "s": "At Risk"}, {"r": 3, "f": 3, "m": 12393.7, "s": "Champions"}, {"r": 36, "f": 2, "m": 195.15, "s": "At Risk"}, {"r": 4, "f": 15, "m": 31906.82, "s": "Champions"}, {"r": 71, "f": 3, "m": 498.95, "s": "At Risk"}, {"r": 75, "f": 1, "m": 329.34, "s": "About to Sleep"}, {"r": 65, "f": 1, "m": 428.89, "s": "About to Sleep"}, {"r": 165, "f": 2, "m": 636.51, "s": "At Risk"}, {"r": 198, "f": 3, "m": 211.77, "s": "About to Sleep"}, {"r": 41, "f": 2, "m": 856.84, "s": "At Risk"}, {"r": 96, "f": 5, "m": 3723.87, "s": "Loyal Customers"}, {"r": 51, "f": 6, "m": 1885.05, "s": "Loyal Customers"}, {"r": 34, "f": 7, "m": 1595.96, "s": "Loyal Customers"}, {"r": 255, "f": 1, "m": 283.71, "s": "About to Sleep"}, {"r": 38, "f": 21, "m": 7205.33, "s": "Loyal Customers"}, {"r": 10, "f": 4, "m": 2279.49, "s": "Champions"}, {"r": 46, "f": 2, "m": 1312.14, "s": "Loyal Customers"}, {"r": 81, "f": 1, "m": 168.31, "s": "About to Sleep"}, {"r": 21, "f": 4, "m": 1422.4, "s": "Loyal Customers"}, {"r": 42, "f": 2, "m": 372.8, "s": "At Risk"}, {"r": 11, "f": 9, "m": 7044.68, "s": "Champions"}, {"r": 81, "f": 1, "m": 358.0, "s": "About to Sleep"}, {"r": 5, "f": 4, "m": 781.78, "s": "Loyal Customers"}, {"r": 173, "f": 1, "m": 323.03, "s": "About to Sleep"}, {"r": 306, "f": 1, "m": 131.9, "s": "About to Sleep"}, {"r": 11, "f": 5, "m": 1314.81, "s": "Champions"}, {"r": 128, "f": 1, "m": 594.0, "s": "About to Sleep"}, {"r": 60, "f": 3, "m": 2854.84, "s": "Loyal Customers"}, {"r": 8, "f": 6, "m": 1793.06, "s": "Champions"}, {"r": 30, "f": 1, "m": 175.92, "s": "New Customers"}, {"r": 320, "f": 1, "m": 265.85, "s": "About to Sleep"}, {"r": 18, "f": 2, "m": 496.06, "s": "New Customers"}, {"r": 174, "f": 2, "m": 289.36, "s": "At Risk"}, {"r": 106, "f": 3, "m": 749.78, "s": "At Risk"}, {"r": 173, "f": 1, "m": 134.1, "s": "About to Sleep"}, {"r": 5, "f": 5, "m": 1845.31, "s": "Champions"}, {"r": 72, "f": 3, "m": 668.43, "s": "At Risk"}, {"r": 20, "f": 2, "m": 424.89, "s": "New Customers"}, {"r": 10, "f": 8, "m": 3023.08, "s": "Champions"}, {"r": 4, "f": 18, "m": 5006.77, "s": "Champions"}, {"r": 39, "f": 8, "m": 7330.8, "s": "Loyal Customers"}, {"r": 190, "f": 1, "m": 119.93, "s": "About to Sleep"}, {"r": 23, "f": 7, "m": 2915.15, "s": "Champions"}, {"r": 5, "f": 6, "m": 1843.75, "s": "Champions"}, {"r": 52, "f": 7, "m": 21279.29, "s": "Loyal Customers"}, {"r": 156, "f": 2, "m": 121.0, "s": "About to Sleep"}, {"r": 4, "f": 6, "m": 2322.4, "s": "Champions"}, {"r": 37, "f": 1, "m": 151.05, "s": "About to Sleep"}, {"r": 26, "f": 1, "m": 332.66, "s": "New Customers"}, {"r": 9, "f": 3, "m": 524.88, "s": "Loyal Customers"}, {"r": 271, "f": 1, "m": 285.33, "s": "About to Sleep"}, {"r": 89, "f": 3, "m": 2398.86, "s": "Loyal Customers"}, {"r": 50, "f": 2, "m": 1212.84, "s": "At Risk"}, {"r": 182, "f": 3, "m": 39916.5, "s": "At Risk"}, {"r": 185, "f": 1, "m": 320.58, "s": "About to Sleep"}, {"r": 204, "f": 1, "m": 89.0, "s": "About to Sleep"}, {"r": 6, "f": 2, "m": 664.11, "s": "Loyal Customers"}, {"r": 5, "f": 5, "m": 2483.63, "s": "Champions"}, {"r": 32, "f": 3, "m": 2195.1, "s": "Loyal Customers"}, {"r": 243, "f": 1, "m": 309.52, "s": "About to Sleep"}, {"r": 19, "f": 4, "m": 1879.05, "s": "Loyal Customers"}, {"r": 37, "f": 6, "m": 2248.56, "s": "Loyal Customers"}, {"r": 19, "f": 3, "m": 347.08, "s": "Loyal Customers"}, {"r": 184, "f": 3, "m": 199.15, "s": "About to Sleep"}, {"r": 39, "f": 1, "m": 214.9, "s": "About to Sleep"}, {"r": 7, "f": 2, "m": 2199.31, "s": "Champions"}, {"r": 313, "f": 1, "m": 494.64, "s": "About to Sleep"}, {"r": 288, "f": 1, "m": 363.65, "s": "About to Sleep"}, {"r": 33, "f": 1, "m": 361.96, "s": "New Customers"}, {"r": 30, "f": 2, "m": 890.34, "s": "Loyal Customers"}, {"r": 10, "f": 11, "m": 5010.28, "s": "Champions"}, {"r": 15, "f": 3, "m": 1339.41, "s": "Loyal Customers"}, {"r": 3, "f": 1, "m": 168.63, "s": "New Customers"}, {"r": 1, "f": 24, "m": 6424.09, "s": "Champions"}, {"r": 75, "f": 4, "m": 924.85, "s": "At Risk"}, {"r": 21, "f": 7, "m": 1461.14, "s": "Champions"}, {"r": 45, "f": 3, "m": 573.22, "s": "At Risk"}, {"r": 35, "f": 1, "m": 71.66, "s": "About to Sleep"}, {"r": 11, "f": 1, "m": 245.1, "s": "New Customers"}, {"r": 97, "f": 3, "m": 1149.02, "s": "At Risk"}, {"r": 249, "f": 1, "m": 12.75, "s": "About to Sleep"}, {"r": 117, "f": 1, "m": 640.14, "s": "About to Sleep"}, {"r": 66, "f": 1, "m": 111.68, "s": "About to Sleep"}, {"r": 274, "f": 1, "m": 101.34, "s": "About to Sleep"}, {"r": 16, "f": 5, "m": 1214.72, "s": "Loyal Customers"}, {"r": 360, "f": 1, "m": 201.2, "s": "About to Sleep"}, {"r": 213, "f": 3, "m": 623.28, "s": "At Risk"}, {"r": 91, "f": 2, "m": 307.48, "s": "At Risk"}, {"r": 302, "f": 2, "m": 167.25, "s": "About to Sleep"}, {"r": 5, "f": 2, "m": 694.05, "s": "Loyal Customers"}, {"r": 24, "f": 4, "m": 974.54, "s": "Loyal Customers"}, {"r": 38, "f": 4, "m": 2560.0, "s": "Loyal Customers"}, {"r": 52, "f": 3, "m": 804.3, "s": "At Risk"}, {"r": 7, "f": 7, "m": 3515.68, "s": "Champions"}, {"r": 57, "f": 5, "m": 1520.58, "s": "Loyal Customers"}, {"r": 54, "f": 1, "m": 351.13, "s": "About to Sleep"}, {"r": 22, "f": 1, "m": 149.29, "s": "About to Sleep"}, {"r": 84, "f": 2, "m": 380.64, "s": "About to Sleep"}, {"r": 10, "f": 4, "m": 2183.54, "s": "Champions"}, {"r": 284, "f": 1, "m": 133.25, "s": "About to Sleep"}, {"r": 57, "f": 1, "m": 279.94, "s": "About to Sleep"}, {"r": 17, "f": 5, "m": 1521.04, "s": "Loyal Customers"}, {"r": 134, "f": 1, "m": 115.8, "s": "About to Sleep"}, {"r": 12, "f": 1, "m": 251.03, "s": "New Customers"}, {"r": 196, "f": 3, "m": 437.7, "s": "At Risk"}, {"r": 205, "f": 2, "m": 216.5, "s": "About to Sleep"}, {"r": 373, "f": 1, "m": 115.65, "s": "About to Sleep"}, {"r": 59, "f": 2, "m": 384.81, "s": "At Risk"}, {"r": 134, "f": 1, "m": 244.8, "s": "About to Sleep"}, {"r": 3, "f": 8, "m": 10416.98, "s": "Champions"}, {"r": 156, "f": 11, "m": 2592.25, "s": "Loyal Customers"}, {"r": 29, "f": 5, "m": 3928.05, "s": "Champions"}, {"r": 169, "f": 3, "m": 388.5, "s": "At Risk"}, {"r": 4, "f": 8, "m": 3974.75, "s": "Champions"}, {"r": 18, "f": 3, "m": 1545.41, "s": "Loyal Customers"}, {"r": 55, "f": 2, "m": 931.03, "s": "At Risk"}, {"r": 66, "f": 1, "m": 449.12, "s": "About to Sleep"}, {"r": 66, "f": 2, "m": 714.42, "s": "At Risk"}, {"r": 9, "f": 5, "m": 1308.61, "s": "Champions"}, {"r": 1, "f": 20, "m": 14034.99, "s": "Champions"}, {"r": 73, "f": 14, "m": 1836.09, "s": "Loyal Customers"}, {"r": 180, "f": 1, "m": 376.58, "s": "About to Sleep"}, {"r": 19, "f": 2, "m": 1231.5, "s": "Loyal Customers"}, {"r": 367, "f": 1, "m": 230.4, "s": "About to Sleep"}, {"r": 78, "f": 3, "m": 1744.76, "s": "At Risk"}, {"r": 92, "f": 1, "m": 296.64, "s": "About to Sleep"}, {"r": 46, "f": 3, "m": 2043.08, "s": "Loyal Customers"}, {"r": 37, "f": 1, "m": 436.06, "s": "About to Sleep"}, {"r": 14, "f": 7, "m": 3408.06, "s": "Champions"}, {"r": 24, "f": 2, "m": 562.41, "s": "Loyal Customers"}, {"r": 4, "f": 4, "m": 653.19, "s": "Loyal Customers"}, {"r": 61, "f": 3, "m": 357.77, "s": "At Risk"}, {"r": 23, "f": 2, "m": 397.68, "s": "New Customers"}, {"r": 92, "f": 9, "m": 1100.27, "s": "Loyal Customers"}, {"r": 69, "f": 3, "m": 824.58, "s": "At Risk"}, {"r": 1, "f": 8, "m": 2708.61, "s": "Champions"}, {"r": 71, "f": 1, "m": 216.85, "s": "About to Sleep"}, {"r": 184, "f": 1, "m": 298.48, "s": "About to Sleep"}, {"r": 71, "f": 3, "m": 1975.35, "s": "Loyal Customers"}, {"r": 1, "f": 4, "m": 728.02, "s": "Loyal Customers"}, {"r": 326, "f": 1, "m": 146.85, "s": "About to Sleep"}, {"r": 362, "f": 1, "m": 121.05, "s": "About to Sleep"}, {"r": 254, "f": 2, "m": 316.25, "s": "About to Sleep"}, {"r": 31, "f": 2, "m": 597.91, "s": "Loyal Customers"}, {"r": 8, "f": 6, "m": 2662.4, "s": "Champions"}, {"r": 45, "f": 7, "m": 10736.48, "s": "Loyal Customers"}, {"r": 77, "f": 1, "m": 505.18, "s": "About to Sleep"}, {"r": 73, "f": 4, "m": 4393.63, "s": "Loyal Customers"}, {"r": 288, "f": 1, "m": 389.5, "s": "About to Sleep"}, {"r": 113, "f": 3, "m": 339.44, "s": "At Risk"}, {"r": 17, "f": 1, "m": 243.55, "s": "About to Sleep"}, {"r": 243, "f": 3, "m": 406.08, "s": "About to Sleep"}, {"r": 25, "f": 3, "m": 2338.6, "s": "Champions"}, {"r": 37, "f": 4, "m": 5732.93, "s": "Loyal Customers"}, {"r": 25, "f": 3, "m": 331.0, "s": "Loyal Customers"}, {"r": 31, "f": 6, "m": 3518.03, "s": "Champions"}, {"r": 45, "f": 5, "m": 1096.32, "s": "Loyal Customers"}, {"r": 17, "f": 7, "m": 5159.06, "s": "Champions"}, {"r": 129, "f": 1, "m": 1595.48, "s": "At Risk"}, {"r": 17, "f": 11, "m": 4095.9, "s": "Champions"}, {"r": 38, "f": 8, "m": 3981.36, "s": "Loyal Customers"}, {"r": 178, "f": 1, "m": 142.92, "s": "About to Sleep"}, {"r": 12, "f": 2, "m": 114.34, "s": "New Customers"}, {"r": 373, "f": 1, "m": 350.06, "s": "About to Sleep"}, {"r": 1, "f": 10, "m": 2367.12, "s": "Champions"}, {"r": 221, "f": 1, "m": 134.8, "s": "About to Sleep"}, {"r": 79, "f": 1, "m": 1862.0, "s": "At Risk"}, {"r": 8, "f": 12, "m": 2888.75, "s": "Champions"}, {"r": 260, "f": 1, "m": 170.95, "s": "About to Sleep"}, {"r": 40, "f": 2, "m": 519.61, "s": "At Risk"}, {"r": 8, "f": 6, "m": 2686.42, "s": "Champions"}, {"r": 336, "f": 1, "m": 135.9, "s": "About to Sleep"}, {"r": 3, "f": 4, "m": 1863.47, "s": "Champions"}, {"r": 39, "f": 1, "m": 162.8, "s": "About to Sleep"}, {"r": 19, "f": 1, "m": 307.09, "s": "New Customers"}, {"r": 22, "f": 2, "m": 169.55, "s": "New Customers"}, {"r": 11, "f": 2, "m": 457.5, "s": "New Customers"}, {"r": 78, "f": 4, "m": 819.29, "s": "At Risk"}, {"r": 58, "f": 3, "m": 794.64, "s": "Loyal Customers"}, {"r": 41, "f": 2, "m": 701.57, "s": "At Risk"}, {"r": 261, "f": 1, "m": 456.9, "s": "About to Sleep"}, {"r": 29, "f": 10, "m": 1715.46, "s": "Champions"}, {"r": 236, "f": 3, "m": 3010.74, "s": "At Risk"}, {"r": 211, "f": 1, "m": 1351.45, "s": "About to Sleep"}, {"r": 74, "f": 3, "m": 657.8, "s": "At Risk"}, {"r": 29, "f": 2, "m": 382.98, "s": "New Customers"}, {"r": 112, "f": 1, "m": 135.95, "s": "About to Sleep"}, {"r": 22, "f": 5, "m": 1555.32, "s": "Loyal Customers"}, {"r": 85, "f": 5, "m": 3029.87, "s": "Loyal Customers"}, {"r": 86, "f": 3, "m": 881.26, "s": "At Risk"}, {"r": 169, "f": 1, "m": 158.85, "s": "About to Sleep"}, {"r": 2, "f": 5, "m": 1123.86, "s": "Champions"}, {"r": 13, "f": 3, "m": 946.64, "s": "Loyal Customers"}, {"r": 68, "f": 2, "m": 567.18, "s": "At Risk"}, {"r": 218, "f": 1, "m": 185.4, "s": "About to Sleep"}, {"r": 16, "f": 12, "m": 10879.76, "s": "Champions"}, {"r": 85, "f": 1, "m": 842.5, "s": "At Risk"}, {"r": 74, "f": 2, "m": 234.34, "s": "About to Sleep"}, {"r": 9, "f": 6, "m": 911.26, "s": "Champions"}, {"r": 10, "f": 4, "m": 1153.62, "s": "Champions"}, {"r": 10, "f": 8, "m": 1660.88, "s": "Champions"}, {"r": 141, "f": 1, "m": 301.03, "s": "About to Sleep"}, {"r": 4, "f": 4, "m": 1293.03, "s": "Champions"}, {"r": 22, "f": 2, "m": 287.59, "s": "New Customers"}, {"r": 60, "f": 3, "m": 554.86, "s": "Loyal Customers"}, {"r": 93, "f": 2, "m": 128.5, "s": "About to Sleep"}, {"r": 9, "f": 4, "m": 3750.4, "s": "Champions"}, {"r": 5, "f": 12, "m": 2314.13, "s": "Champions"}, {"r": 16, "f": 9, "m": 3641.24, "s": "Champions"}, {"r": 8, "f": 46, "m": 194390.79, "s": "Champions"}, {"r": 3, "f": 3, "m": 666.1, "s": "Loyal Customers"}, {"r": 32, "f": 5, "m": 1477.66, "s": "Loyal Customers"}, {"r": 134, "f": 1, "m": 707.09, "s": "About to Sleep"}, {"r": 57, "f": 7, "m": 790.86, "s": "Loyal Customers"}, {"r": 74, "f": 11, "m": 5232.23, "s": "Loyal Customers"}, {"r": 174, "f": 2, "m": 460.59, "s": "At Risk"}, {"r": 52, "f": 1, "m": 307.78, "s": "At Risk"}, {"r": 154, "f": 2, "m": 622.85, "s": "At Risk"}, {"r": 3, "f": 7, "m": 3501.1, "s": "Champions"}, {"r": 65, "f": 1, "m": 92.46, "s": "About to Sleep"}, {"r": 60, "f": 4, "m": 2404.17, "s": "Loyal Customers"}, {"r": 15, "f": 3, "m": 965.61, "s": "Loyal Customers"}, {"r": 7, "f": 2, "m": 52.2, "s": "New Customers"}, {"r": 31, "f": 2, "m": 1010.29, "s": "Loyal Customers"}, {"r": 31, "f": 1, "m": 2328.84, "s": "Loyal Customers"}, {"r": 33, "f": 1, "m": 45.6, "s": "About to Sleep"}, {"r": 19, "f": 15, "m": 6910.78, "s": "Champions"}, {"r": 59, "f": 4, "m": 1268.7, "s": "Loyal Customers"}, {"r": 169, "f": 2, "m": 623.16, "s": "At Risk"}, {"r": 22, "f": 1, "m": 209.49, "s": "About to Sleep"}, {"r": 68, "f": 4, "m": 1592.06, "s": "Loyal Customers"}, {"r": 169, "f": 2, "m": 885.19, "s": "At Risk"}, {"r": 149, "f": 1, "m": 299.05, "s": "About to Sleep"}, {"r": 70, "f": 2, "m": 869.67, "s": "At Risk"}, {"r": 308, "f": 1, "m": 381.32, "s": "About to Sleep"}, {"r": 45, "f": 2, "m": 6.9, "s": "At Risk"}, {"r": 9, "f": 9, "m": 1871.77, "s": "Champions"}, {"r": 45, "f": 1, "m": 650.75, "s": "At Risk"}, {"r": 33, "f": 4, "m": 971.76, "s": "Loyal Customers"}, {"r": 24, "f": 2, "m": 3718.8, "s": "Loyal Customers"}, {"r": 32, "f": 4, "m": 2118.03, "s": "Champions"}, {"r": 60, "f": 2, "m": 894.41, "s": "At Risk"}, {"r": 63, "f": 3, "m": 1175.22, "s": "Loyal Customers"}, {"r": 96, "f": 6, "m": 3185.64, "s": "Loyal Customers"}, {"r": 3, "f": 13, "m": 5298.48, "s": "Champions"}, {"r": 60, "f": 1, "m": 81.44, "s": "About to Sleep"}, {"r": 236, "f": 1, "m": 226.84, "s": "About to Sleep"}, {"r": 107, "f": 3, "m": 534.85, "s": "At Risk"}, {"r": 218, "f": 1, "m": 67.95, "s": "About to Sleep"}, {"r": 3, "f": 12, "m": 5504.96, "s": "Champions"}, {"r": 10, "f": 2, "m": 344.0, "s": "New Customers"}, {"r": 179, "f": 1, "m": 58.08, "s": "About to Sleep"}, {"r": 13, "f": 7, "m": 1905.87, "s": "Champions"}, {"r": 15, "f": 7, "m": 906.52, "s": "Loyal Customers"}, {"r": 95, "f": 2, "m": 713.3, "s": "At Risk"}, {"r": 39, "f": 2, "m": 692.19, "s": "At Risk"}, {"r": 189, "f": 2, "m": 506.8, "s": "About to Sleep"}, {"r": 79, "f": 2, "m": 254.18, "s": "About to Sleep"}, {"r": 79, "f": 1, "m": 48.48, "s": "About to Sleep"}, {"r": 10, "f": 3, "m": 3509.43, "s": "Champions"}, {"r": 71, "f": 1, "m": 300.02, "s": "At Risk"}, {"r": 132, "f": 2, "m": 765.34, "s": "At Risk"}, {"r": 57, "f": 3, "m": 1553.18, "s": "Loyal Customers"}, {"r": 31, "f": 5, "m": 727.74, "s": "Loyal Customers"}, {"r": 73, "f": 1, "m": 144.2, "s": "About to Sleep"}, {"r": 99, "f": 1, "m": 305.28, "s": "About to Sleep"}, {"r": 15, "f": 1, "m": 256.11, "s": "New Customers"}, {"r": 53, "f": 1, "m": 352.7, "s": "About to Sleep"}, {"r": 127, "f": 2, "m": 730.86, "s": "At Risk"}, {"r": 24, "f": 6, "m": 1367.88, "s": "Champions"}, {"r": 65, "f": 1, "m": 133.06, "s": "About to Sleep"}, {"r": 19, "f": 2, "m": 260.68, "s": "New Customers"}, {"r": 61, "f": 1, "m": 166.03, "s": "About to Sleep"}, {"r": 280, "f": 1, "m": 96.8, "s": "About to Sleep"}, {"r": 326, "f": 1, "m": 77183.6, "s": "At Risk"}, {"r": 320, "f": 1, "m": 2661.24, "s": "At Risk"}, {"r": 358, "f": 1, "m": 476.35, "s": "About to Sleep"}, {"r": 77, "f": 1, "m": 1098.78, "s": "At Risk"}, {"r": 205, "f": 2, "m": 1589.82, "s": "At Risk"}, {"r": 17, "f": 2, "m": 364.72, "s": "New Customers"}, {"r": 107, "f": 3, "m": 623.51, "s": "At Risk"}, {"r": 148, "f": 2, "m": 554.38, "s": "At Risk"}, {"r": 10, "f": 5, "m": 1472.34, "s": "Champions"}, {"r": 109, "f": 2, "m": 530.18, "s": "At Risk"}, {"r": 219, "f": 2, "m": 611.88, "s": "At Risk"}, {"r": 111, "f": 2, "m": 716.0, "s": "At Risk"}, {"r": 14, "f": 21, "m": 6416.7, "s": "Champions"}, {"r": 91, "f": 2, "m": 671.96, "s": "At Risk"}, {"r": 149, "f": 1, "m": 574.7, "s": "About to Sleep"}, {"r": 64, "f": 8, "m": 1921.55, "s": "Loyal Customers"}, {"r": 21, "f": 2, "m": 1280.58, "s": "Loyal Customers"}, {"r": 46, "f": 3, "m": 4919.0, "s": "Loyal Customers"}, {"r": 32, "f": 1, "m": 428.89, "s": "New Customers"}, {"r": 124, "f": 2, "m": 462.66, "s": "At Risk"}, {"r": 22, "f": 4, "m": 1465.12, "s": "Loyal Customers"}, {"r": 114, "f": 1, "m": 4873.81, "s": "At Risk"}, {"r": 5, "f": 7, "m": 2031.78, "s": "Champions"}, {"r": 79, "f": 4, "m": 1391.98, "s": "Loyal Customers"}, {"r": 17, "f": 2, "m": 867.85, "s": "Loyal Customers"}, {"r": 33, "f": 5, "m": 2328.97, "s": "Champions"}, {"r": 15, "f": 3, "m": 1059.39, "s": "Loyal Customers"}, {"r": 20, "f": 2, "m": 480.31, "s": "New Customers"}, {"r": 19, "f": 5, "m": 1404.07, "s": "Loyal Customers"}, {"r": 5, "f": 1, "m": 380.13, "s": "New Customers"}, {"r": 8, "f": 8, "m": 2702.49, "s": "Champions"}, {"r": 67, "f": 8, "m": 1756.44, "s": "Loyal Customers"}, {"r": 20, "f": 17, "m": 13400.24, "s": "Champions"}, {"r": 151, "f": 2, "m": 486.82, "s": "About to Sleep"}, {"r": 40, "f": 1, "m": 316.88, "s": "About to Sleep"}, {"r": 16, "f": 7, "m": 1099.98, "s": "Champions"}, {"r": 24, "f": 3, "m": 1348.88, "s": "Loyal Customers"}, {"r": 8, "f": 3, "m": 789.79, "s": "Loyal Customers"}, {"r": 14, "f": 4, "m": 599.48, "s": "Loyal Customers"}, {"r": 72, "f": 3, "m": 429.56, "s": "At Risk"}, {"r": 90, "f": 1, "m": 252.73, "s": "About to Sleep"}, {"r": 38, "f": 2, "m": 429.84, "s": "At Risk"}, {"r": 114, "f": 3, "m": 1475.43, "s": "Loyal Customers"}, {"r": 6, "f": 8, "m": 801.12, "s": "Champions"}, {"r": 1, "f": 8, "m": 3628.5, "s": "Champions"}, {"r": 64, "f": 2, "m": 590.93, "s": "At Risk"}, {"r": 53, "f": 9, "m": 2241.1, "s": "Loyal Customers"}, {"r": 10, "f": 6, "m": 3401.24, "s": "Champions"}, {"r": 29, "f": 4, "m": 741.37, "s": "Loyal Customers"}, {"r": 36, "f": 4, "m": 247.96, "s": "At Risk"}, {"r": 109, "f": 2, "m": 167.61, "s": "About to Sleep"}, {"r": 277, "f": 1, "m": 197.0, "s": "About to Sleep"}, {"r": 75, "f": 3, "m": 371.62, "s": "At Risk"}, {"r": 155, "f": 1, "m": 318.05, "s": "About to Sleep"}, {"r": 45, "f": 5, "m": 1706.57, "s": "Loyal Customers"}, {"r": 307, "f": 1, "m": 142.4, "s": "About to Sleep"}, {"r": 107, "f": 6, "m": 2157.73, "s": "Loyal Customers"}, {"r": 218, "f": 2, "m": 3251.07, "s": "At Risk"}, {"r": 153, "f": 4, "m": 1817.54, "s": "Loyal Customers"}, {"r": 74, "f": 2, "m": 605.12, "s": "At Risk"}, {"r": 71, "f": 1, "m": 199.8, "s": "About to Sleep"}, {"r": 35, "f": 3, "m": 1097.98, "s": "Loyal Customers"}, {"r": 26, "f": 4, "m": 1348.93, "s": "Loyal Customers"}, {"r": 33, "f": 6, "m": 10797.48, "s": "Champions"}, {"r": 281, "f": 1, "m": 225.9, "s": "About to Sleep"}, {"r": 38, "f": 1, "m": 43.5, "s": "About to Sleep"}, {"r": 15, "f": 2, "m": 250.26, "s": "New Customers"}, {"r": 72, "f": 1, "m": 248.61, "s": "About to Sleep"}, {"r": 4, "f": 47, "m": 37130.6, "s": "Champions"}, {"r": 20, "f": 2, "m": 636.24, "s": "Loyal Customers"}, {"r": 232, "f": 2, "m": 856.6, "s": "At Risk"}, {"r": 8, "f": 9, "m": 4881.88, "s": "Champions"}, {"r": 73, "f": 5, "m": 2446.6, "s": "Loyal Customers"}, {"r": 64, "f": 1, "m": 315.06, "s": "At Risk"}, {"r": 11, "f": 6, "m": 1981.92, "s": "Champions"}, {"r": 6, "f": 1, "m": 486.22, "s": "New Customers"}, {"r": 37, "f": 6, "m": 1016.14, "s": "Loyal Customers"}, {"r": 44, "f": 2, "m": 348.1, "s": "At Risk"}, {"r": 72, "f": 5, "m": 2867.2, "s": "Loyal Customers"}, {"r": 29, "f": 1, "m": 352.98, "s": "New Customers"}, {"r": 9, "f": 7, "m": 1417.63, "s": "Champions"}, {"r": 158, "f": 9, "m": 7374.9, "s": "Loyal Customers"}, {"r": 368, "f": 1, "m": 180.7, "s": "About to Sleep"}, {"r": 3, "f": 15, "m": 7616.53, "s": "Champions"}, {"r": 1, "f": 11, "m": 3849.78, "s": "Champions"}, {"r": 1, "f": 5, "m": 518.19, "s": "Loyal Customers"}, {"r": 59, "f": 4, "m": 2610.36, "s": "Loyal Customers"}, {"r": 241, "f": 1, "m": 313.8, "s": "About to Sleep"}, {"r": 154, "f": 2, "m": 1705.8, "s": "At Risk"}, {"r": 72, "f": 1, "m": 518.42, "s": "At Risk"}, {"r": 3, "f": 3, "m": 758.29, "s": "Loyal Customers"}, {"r": 334, "f": 1, "m": 332.41, "s": "About to Sleep"}, {"r": 170, "f": 1, "m": 137.45, "s": "About to Sleep"}, {"r": 3, "f": 4, "m": 501.28, "s": "Loyal Customers"}, {"r": 155, "f": 3, "m": 631.9, "s": "At Risk"}, {"r": 47, "f": 1, "m": 278.3, "s": "About to Sleep"}, {"r": 18, "f": 4, "m": 848.22, "s": "Loyal Customers"}, {"r": 23, "f": 5, "m": 914.69, "s": "Loyal Customers"}, {"r": 28, "f": 1, "m": 399.09, "s": "New Customers"}, {"r": 54, "f": 1, "m": 1077.74, "s": "At Risk"}, {"r": 58, "f": 3, "m": 409.8, "s": "At Risk"}, {"r": 26, "f": 1, "m": 261.9, "s": "New Customers"}, {"r": 74, "f": 1, "m": 277.8, "s": "About to Sleep"}, {"r": 4, "f": 2, "m": 935.05, "s": "Loyal Customers"}, {"r": 206, "f": 9, "m": 2997.03, "s": "Loyal Customers"}, {"r": 323, "f": 1, "m": 229.47, "s": "About to Sleep"}, {"r": 232, "f": 1, "m": 1079.4, "s": "About to Sleep"}, {"r": 8, "f": 2, "m": 319.0, "s": "Loyal Customers"}, {"r": 288, "f": 1, "m": 127.86, "s": "About to Sleep"}, {"r": 12, "f": 2, "m": 330.03, "s": "Loyal Customers"}, {"r": 11, "f": 1, "m": 336.4, "s": "New Customers"}, {"r": 139, "f": 2, "m": 550.01, "s": "At Risk"}, {"r": 223, "f": 1, "m": 383.45, "s": "About to Sleep"}, {"r": 6, "f": 3, "m": 430.15, "s": "Loyal Customers"}, {"r": 32, "f": 1, "m": 603.75, "s": "New Customers"}, {"r": 51, "f": 1, "m": 430.5, "s": "About to Sleep"}, {"r": 82, "f": 3, "m": 1285.04, "s": "Loyal Customers"}, {"r": 294, "f": 1, "m": 34.0, "s": "About to Sleep"}, {"r": 281, "f": 5, "m": 1077.39, "s": "At Risk"}, {"r": 40, "f": 4, "m": 690.0, "s": "Loyal Customers"}, {"r": 20, "f": 1, "m": 107.6, "s": "New Customers"}, {"r": 15, "f": 6, "m": 306.72, "s": "Loyal Customers"}, {"r": 22, "f": 3, "m": 825.8, "s": "Loyal Customers"}, {"r": 65, "f": 1, "m": 202.27, "s": "About to Sleep"}, {"r": 202, "f": 1, "m": 306.13, "s": "About to Sleep"}, {"r": 219, "f": 1, "m": 179.0, "s": "About to Sleep"}, {"r": 11, "f": 11, "m": 5756.89, "s": "Champions"}, {"r": 18, "f": 6, "m": 1961.52, "s": "Champions"}, {"r": 71, "f": 1, "m": 1290.7, "s": "At Risk"}, {"r": 330, "f": 1, "m": 534.57, "s": "About to Sleep"}, {"r": 4, "f": 2, "m": 230.65, "s": "New Customers"}, {"r": 4, "f": 2, "m": 353.65, "s": "New Customers"}, {"r": 70, "f": 1, "m": 618.59, "s": "At Risk"}, {"r": 57, "f": 1, "m": 262.2, "s": "At Risk"}, {"r": 57, "f": 1, "m": 300.85, "s": "At Risk"}, {"r": 373, "f": 1, "m": 207.5, "s": "About to Sleep"}, {"r": 143, "f": 2, "m": 356.7, "s": "At Risk"}, {"r": 33, "f": 5, "m": 3964.88, "s": "Champions"}, {"r": 6, "f": 2, "m": 632.0, "s": "Loyal Customers"}, {"r": 262, "f": 1, "m": 215.05, "s": "About to Sleep"}, {"r": 25, "f": 2, "m": 215.08, "s": "New Customers"}, {"r": 16, "f": 7, "m": 1139.73, "s": "Champions"}, {"r": 227, "f": 1, "m": 358.38, "s": "About to Sleep"}, {"r": 11, "f": 1, "m": 127.86, "s": "New Customers"}, {"r": 185, "f": 5, "m": 1850.56, "s": "At Risk"}, {"r": 65, "f": 2, "m": 583.75, "s": "At Risk"}, {"r": 50, "f": 3, "m": 731.9, "s": "Loyal Customers"}, {"r": 31, "f": 2, "m": 502.8, "s": "Loyal Customers"}, {"r": 14, "f": 4, "m": 1676.06, "s": "Loyal Customers"}, {"r": 1, "f": 28, "m": 28882.44, "s": "Champions"}, {"r": 262, "f": 1, "m": 237.07, "s": "About to Sleep"}, {"r": 60, "f": 1, "m": 892.47, "s": "At Risk"}, {"r": 10, "f": 2, "m": 300.83, "s": "Loyal Customers"}, {"r": 140, "f": 4, "m": 2293.62, "s": "Loyal Customers"}, {"r": 104, "f": 5, "m": 1375.71, "s": "Loyal Customers"}, {"r": 152, "f": 5, "m": 989.45, "s": "Loyal Customers"}, {"r": 162, "f": 2, "m": 1145.84, "s": "At Risk"}, {"r": 174, "f": 1, "m": 178.52, "s": "About to Sleep"}, {"r": 51, "f": 4, "m": 559.97, "s": "Loyal Customers"}, {"r": 177, "f": 1, "m": 76.5, "s": "About to Sleep"}, {"r": 145, "f": 1, "m": 783.9, "s": "At Risk"}, {"r": 3, "f": 5, "m": 1191.13, "s": "Champions"}, {"r": 19, "f": 1, "m": 612.01, "s": "New Customers"}, {"r": 4, "f": 1, "m": 312.62, "s": "New Customers"}, {"r": 179, "f": 2, "m": 1238.47, "s": "At Risk"}, {"r": 106, "f": 2, "m": 706.57, "s": "At Risk"}, {"r": 19, "f": 5, "m": 1163.23, "s": "Loyal Customers"}, {"r": 10, "f": 4, "m": 1648.12, "s": "Champions"}, {"r": 80, "f": 3, "m": 908.46, "s": "At Risk"}, {"r": 23, "f": 10, "m": 9401.28, "s": "Champions"}, {"r": 88, "f": 1, "m": 309.05, "s": "About to Sleep"}, {"r": 41, "f": 11, "m": 2085.33, "s": "Loyal Customers"}, {"r": 45, "f": 5, "m": 1125.07, "s": "Loyal Customers"}, {"r": 19, "f": 3, "m": 807.57, "s": "Loyal Customers"}, {"r": 4, "f": 1, "m": 89.94, "s": "New Customers"}, {"r": 234, "f": 1, "m": 101.19, "s": "About to Sleep"}, {"r": 367, "f": 1, "m": 307.82, "s": "About to Sleep"}, {"r": 20, "f": 1, "m": 219.0, "s": "About to Sleep"}, {"r": 59, "f": 8, "m": 1453.35, "s": "Loyal Customers"}, {"r": 40, "f": 8, "m": 3000.2, "s": "Loyal Customers"}, {"r": 174, "f": 2, "m": 404.3, "s": "At Risk"}, {"r": 357, "f": 1, "m": 316.58, "s": "About to Sleep"}, {"r": 177, "f": 1, "m": 323.0, "s": "About to Sleep"}, {"r": 374, "f": 1, "m": 233.45, "s": "About to Sleep"}, {"r": 8, "f": 20, "m": 11138.71, "s": "Champions"}, {"r": 29, "f": 7, "m": 1511.8, "s": "Champions"}, {"r": 17, "f": 3, "m": 887.11, "s": "Loyal Customers"}, {"r": 26, "f": 2, "m": 841.2, "s": "Loyal Customers"}, {"r": 6, "f": 14, "m": 3039.22, "s": "Champions"}, {"r": 32, "f": 2, "m": 383.03, "s": "New Customers"}, {"r": 25, "f": 2, "m": 550.06, "s": "Loyal Customers"}, {"r": 281, "f": 1, "m": 166.04, "s": "About to Sleep"}, {"r": 9, "f": 5, "m": 1690.26, "s": "Champions"}, {"r": 290, "f": 1, "m": 113.44, "s": "About to Sleep"}, {"r": 81, "f": 3, "m": 523.0, "s": "At Risk"}, {"r": 11, "f": 1, "m": 361.62, "s": "New Customers"}, {"r": 190, "f": 2, "m": 112.2, "s": "About to Sleep"}, {"r": 25, "f": 8, "m": 3408.48, "s": "Champions"}, {"r": 36, "f": 5, "m": 2022.98, "s": "Loyal Customers"}, {"r": 2, "f": 9, "m": 3479.91, "s": "Champions"}, {"r": 39, "f": 2, "m": 192.72, "s": "About to Sleep"}, {"r": 17, "f": 12, "m": 2999.46, "s": "Champions"}, {"r": 292, "f": 1, "m": 505.82, "s": "About to Sleep"}, {"r": 148, "f": 3, "m": 2940.04, "s": "Loyal Customers"}, {"r": 92, "f": 2, "m": 437.6, "s": "About to Sleep"}, {"r": 138, "f": 1, "m": 449.73, "s": "About to Sleep"}, {"r": 109, "f": 2, "m": 608.79, "s": "At Risk"}, {"r": 278, "f": 1, "m": 328.8, "s": "About to Sleep"}, {"r": 3, "f": 4, "m": 434.35, "s": "Loyal Customers"}, {"r": 31, "f": 2, "m": 595.25, "s": "Loyal Customers"}, {"r": 289, "f": 1, "m": 101.7, "s": "About to Sleep"}, {"r": 297, "f": 1, "m": 1784.71, "s": "About to Sleep"}, {"r": 31, "f": 4, "m": 639.02, "s": "Loyal Customers"}, {"r": 29, "f": 2, "m": 646.68, "s": "New Customers"}, {"r": 359, "f": 1, "m": 271.05, "s": "About to Sleep"}, {"r": 74, "f": 1, "m": 152.2, "s": "About to Sleep"}, {"r": 138, "f": 1, "m": 197.9, "s": "About to Sleep"}, {"r": 197, "f": 3, "m": 267.16, "s": "At Risk"}, {"r": 75, "f": 1, "m": 318.0, "s": "About to Sleep"}, {"r": 191, "f": 4, "m": 1431.78, "s": "At Risk"}, {"r": 1, "f": 24, "m": 12245.96, "s": "Champions"}, {"r": 17, "f": 3, "m": 819.96, "s": "Loyal Customers"}, {"r": 15, "f": 6, "m": 5955.71, "s": "Champions"}, {"r": 44, "f": 1, "m": 379.45, "s": "At Risk"}, {"r": 216, "f": 1, "m": 141.86, "s": "About to Sleep"}, {"r": 26, "f": 11, "m": 5725.47, "s": "Champions"}, {"r": 275, "f": 1, "m": 223.95, "s": "About to Sleep"}, {"r": 320, "f": 1, "m": 155.0, "s": "About to Sleep"}, {"r": 79, "f": 1, "m": 964.83, "s": "At Risk"}, {"r": 11, "f": 14, "m": 6776.56, "s": "Champions"}, {"r": 9, "f": 2, "m": 708.22, "s": "Loyal Customers"}, {"r": 157, "f": 3, "m": 186.42, "s": "At Risk"}, {"r": 31, "f": 5, "m": 2114.33, "s": "Champions"}, {"r": 22, "f": 1, "m": 91.8, "s": "About to Sleep"}, {"r": 2, "f": 20, "m": 8134.94, "s": "Champions"}, {"r": 3, "f": 4, "m": 1046.56, "s": "Champions"}, {"r": 16, "f": 9, "m": 2478.95, "s": "Champions"}, {"r": 10, "f": 1, "m": 170.16, "s": "New Customers"}, {"r": 24, "f": 2, "m": 470.8, "s": "New Customers"}, {"r": 47, "f": 1, "m": 731.5, "s": "At Risk"}, {"r": 14, "f": 5, "m": 1698.07, "s": "Loyal Customers"}, {"r": 50, "f": 4, "m": 913.68, "s": "Loyal Customers"}, {"r": 107, "f": 1, "m": 628.38, "s": "About to Sleep"}, {"r": 2, "f": 26, "m": 13027.45, "s": "Champions"}, {"r": 252, "f": 1, "m": 37.4, "s": "About to Sleep"}, {"r": 296, "f": 1, "m": 1257.87, "s": "About to Sleep"}, {"r": 20, "f": 11, "m": 4630.35, "s": "Champions"}], "cohort": {"months": ["2010-12", "2011-01", "2011-02", "2011-03", "2011-04", "2011-05", "2011-06", "2011-07", "2011-08", "2011-09", "2011-10", "2011-11", "2011-12"], "indices": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "retention": [[1.0, 0.3661, 0.3232, 0.3842, 0.3627, 0.3977, 0.3627, 0.3492, 0.3537, 0.3955, 0.374, 0.5028, 0.2655], [1.0, 0.2206, 0.2662, 0.2302, 0.3213, 0.2878, 0.247, 0.2422, 0.2998, 0.3261, 0.3645, 0.1175, null], [1.0, 0.1868, 0.1868, 0.2842, 0.2711, 0.2474, 0.2526, 0.2789, 0.2474, 0.3053, 0.0684, null, null], [1.0, 0.1504, 0.2522, 0.1991, 0.2235, 0.1681, 0.2677, 0.2301, 0.2788, 0.0863, null, null, null], [1.0, 0.2133, 0.2033, 0.21, 0.1967, 0.2267, 0.2167, 0.26, 0.0733, null, null, null, null], [1.0, 0.1901, 0.1725, 0.1725, 0.2077, 0.2324, 0.2641, 0.0951, null, null, null, null, null], [1.0, 0.1736, 0.157, 0.2645, 0.2314, 0.3347, 0.095, null, null, null, null, null, null], [1.0, 0.1809, 0.2074, 0.2234, 0.2713, 0.1117, null, null, null, null, null, null, null], [1.0, 0.2071, 0.2485, 0.2426, 0.1243, null, null, null, null, null, null, null, null], [1.0, 0.2341, 0.301, 0.1137, null, null, null, null, null, null, null, null, null], [1.0, 0.2402, 0.1145, null, null, null, null, null, null, null, null, null, null], [1.0, 0.1115, null, null, null, null, null, null, null, null, null, null, null], [1.0, null, null, null, null, null, null, null, null, null, null, null, null]], "counts": [[885, 324, 286, 340, 321, 352, 321, 309, 313, 350, 331, 445, 235], [417, 92, 111, 96, 134, 120, 103, 101, 125, 136, 152, 49, null], [380, 71, 71, 108, 103, 94, 96, 106, 94, 116, 26, null, null], [452, 68, 114, 90, 101, 76, 121, 104, 126, 39, null, null, null], [300, 64, 61, 63, 59, 68, 65, 78, 22, null, null, null, null], [284, 54, 49, 49, 59, 66, 75, 27, null, null, null, null, null], [242, 42, 38, 64, 56, 81, 23, null, null, null, null, null, null], [188, 34, 39, 42, 51, 21, null, null, null, null, null, null, null], [169, 35, 42, 41, 21, null, null, null, null, null, null, null, null], [299, 70, 90, 34, null, null, null, null, null, null, null, null, null], [358, 86, 41, null, null, null, null, null, null, null, null, null, null], [323, 36, null, null, null, null, null, null, null, null, null, null, null], [41, null, null, null, null, null, null, null, null, null, null, null, null]]}};
+
+// ---- utils ----
+const fmt = {
+  money: n => '$' + Math.round(n).toLocaleString(),
+  moneyK: n => {
+    if (n >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return '$' + (n / 1e3).toFixed(0) + 'K';
+    return '$' + Math.round(n);
+  },
+  int: n => Math.round(n).toLocaleString(),
+  pct: n => (n == null ? '' : (n * 100).toFixed(1) + '%'),
+};
+
+const palette = [
+  '#2563eb', '#16a34a', '#d97706', '#dc2626', '#7c3aed',
+  '#0891b2', '#db2777', '#65a30d', '#ea580c', '#475569',
+];
+
+Chart.defaults.font.family = "'Segoe UI', 'Noto Sans KR', system-ui, sans-serif";
+Chart.defaults.color = '#475569';
+Chart.defaults.plugins.legend.labels.usePointStyle = true;
+
+// ---- Tabs ----
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ---- KPI cards ----
+const kpi = DATA.kpi, meta = DATA.meta;
+const kpiCards = [
+  { label: '총 매출액', value: fmt.money(kpi.total_revenue), sub: 'USD 기준' },
+  { label: '총 주문 건수', value: fmt.int(kpi.total_orders), sub: '고유 InvoiceNo' },
+  { label: '고유 고객 수', value: fmt.int(kpi.unique_customers), sub: 'CustomerID 기준' },
+  { label: '평균 주문액 (AOV)', value: '$' + kpi.aov.toFixed(2), sub: '총 매출 / 주문 수' },
+  { label: '총 판매 수량', value: fmt.int(kpi.total_items), sub: 'Quantity 합계' },
+  { label: '취급 국가 수', value: kpi.country_count, sub: '' },
+  { label: '취급 상품 SKU', value: fmt.int(kpi.product_count), sub: 'StockCode 기준' },
+];
+document.getElementById('kpiGrid').innerHTML = kpiCards.map(k =>
+  `<div class="kpi"><div class="label">${k.label}</div><div class="value">${k.value}</div><div class="sub">${k.sub}</div></div>`
+).join('');
+
+document.getElementById('metaTable').innerHTML = `
+  <tr><th>분석 기간</th><td>${meta.date_min} ~ ${meta.date_max}</td></tr>
+  <tr><th>원본 데이터</th><td class="num">${fmt.int(meta.raw_rows)} 건</td></tr>
+  <tr><th>고객정보 정제 후</th><td class="num">${fmt.int(meta.after_customer_drop)} 건</td></tr>
+  <tr><th>수량/단가 이상치 제거 후</th><td class="num">${fmt.int(meta.after_outlier_drop)} 건</td></tr>
+  <tr><th>중복 제거 후 최종</th><td class="num"><b>${fmt.int(meta.after_dedup)} 건</b></td></tr>
+`;
+
+// ---- 1) Cleaning Funnel ----
+new Chart(document.getElementById('cleanFunnel'), {
+  type: 'bar',
+  data: {
+    labels: ['원본', 'CustomerID 정제', '이상치 제거', '중복 제거 (최종)'],
+    datasets: [{
+      label: '데이터 건수',
+      data: [meta.raw_rows, meta.after_customer_drop, meta.after_outlier_drop, meta.after_dedup],
+      backgroundColor: ['#cbd5e1', '#93c5fd', '#60a5fa', '#2563eb'],
+      borderRadius: 6,
+    }],
+  },
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false },
+      tooltip: { callbacks: { label: ctx => fmt.int(ctx.parsed.x) + ' 건' } } },
+    scales: { x: { ticks: { callback: v => fmt.int(v) } } },
+  },
+});
+
+// ---- 2) Monthly Chart ----
+new Chart(document.getElementById('monthlyChart'), {
+  type: 'bar',
+  data: {
+    labels: DATA.monthly.labels,
+    datasets: [
+      { type: 'bar', label: '주문 건수', data: DATA.monthly.orders,
+        backgroundColor: '#c7d2fe', yAxisID: 'y1', borderRadius: 4 },
+      { type: 'line', label: '매출액', data: DATA.monthly.revenue,
+        borderColor: '#2563eb', backgroundColor: '#2563eb', tension: 0.35,
+        yAxisID: 'y', borderWidth: 3, pointRadius: 4 },
+    ],
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      tooltip: { callbacks: { label: ctx => {
+        if (ctx.dataset.label === '매출액') return '매출: ' + fmt.money(ctx.parsed.y);
+        return '주문: ' + fmt.int(ctx.parsed.y) + '건';
+      } } },
+    },
+    scales: {
+      y: { position: 'left', title: { display: true, text: '매출액 (USD)' },
+        ticks: { callback: v => fmt.moneyK(v) } },
+      y1: { position: 'right', title: { display: true, text: '주문 건수' },
+        grid: { drawOnChartArea: false }, ticks: { callback: v => fmt.int(v) } },
+    },
+  },
+});
+
+// ---- 3) Hourly ----
+new Chart(document.getElementById('hourlyChart'), {
+  type: 'bar',
+  data: {
+    labels: DATA.hourly.labels.map(h => h + '시'),
+    datasets: [{
+      label: '주문 건수', data: DATA.hourly.orders,
+      backgroundColor: DATA.hourly.orders.map((v, i, arr) => {
+        const max = Math.max(...arr);
+        const ratio = v / max;
+        return `rgba(37, 99, 235, ${0.35 + ratio * 0.55})`;
+      }),
+      borderRadius: 4,
+    }],
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { y: { ticks: { callback: v => fmt.int(v) } } },
+  },
+});
+
+// ---- 4) DOW ----
+new Chart(document.getElementById('dowChart'), {
+  type: 'bar',
+  data: {
+    labels: DATA.dow.labels,
+    datasets: [
+      { label: '매출액', data: DATA.dow.revenue, backgroundColor: '#16a34a', yAxisID: 'y', borderRadius: 4 },
+      { type: 'line', label: '주문 건수', data: DATA.dow.orders,
+        borderColor: '#d97706', backgroundColor: '#d97706', yAxisID: 'y1', tension: 0.3 },
+    ],
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { tooltip: { callbacks: { label: ctx => {
+      if (ctx.dataset.label === '매출액') return '매출: ' + fmt.money(ctx.parsed.y);
+      return '주문: ' + fmt.int(ctx.parsed.y) + '건';
+    } } } },
+    scales: {
+      y: { position: 'left', ticks: { callback: v => fmt.moneyK(v) } },
+      y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { callback: v => fmt.int(v) } },
+    },
+  },
+});
+
+// ---- 5) Country Bar ----
+new Chart(document.getElementById('countryBar'), {
+  type: 'bar',
+  data: {
+    labels: DATA.countries_top.labels,
+    datasets: [{
+      label: '매출액', data: DATA.countries_top.revenue,
+      backgroundColor: DATA.countries_top.revenue.map((_, i) => palette[i % palette.length]),
+      borderRadius: 4,
+    }],
+  },
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false },
+      tooltip: { callbacks: { label: ctx => '매출: ' + fmt.money(ctx.parsed.x) } } },
+    scales: { x: { ticks: { callback: v => fmt.moneyK(v) } } },
+  },
+});
+
+// ---- 6) Country Pie ----
+const top10Sum = DATA.countries_top.revenue.reduce((a, b) => a + b, 0);
+const others = Math.max(0, DATA.countries_top.total_revenue - top10Sum);
+new Chart(document.getElementById('countryPie'), {
+  type: 'doughnut',
+  data: {
+    labels: [...DATA.countries_top.labels, '기타'],
+    datasets: [{
+      data: [...DATA.countries_top.revenue, others],
+      backgroundColor: [...DATA.countries_top.labels.map((_, i) => palette[i % palette.length]), '#cbd5e1'],
+    }],
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } },
+      tooltip: { callbacks: { label: ctx => {
+        const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+        const pct = ((ctx.parsed / total) * 100).toFixed(1);
+        return `${ctx.label}: ${fmt.money(ctx.parsed)} (${pct}%)`;
+      } } },
+    },
+  },
+});
+
+// ---- 7) Top Qty ----
+new Chart(document.getElementById('topQty'), {
+  type: 'bar',
+  data: {
+    labels: DATA.products_qty.labels,
+    datasets: [{
+      label: '판매 수량', data: DATA.products_qty.values,
+      backgroundColor: '#7c3aed', borderRadius: 4,
+    }],
+  },
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false },
+      tooltip: { callbacks: { label: ctx => fmt.int(ctx.parsed.x) + ' 개' } } },
+    scales: { x: { ticks: { callback: v => fmt.int(v) } } },
+  },
+});
+
+// ---- 8) Top Rev ----
+new Chart(document.getElementById('topRev'), {
+  type: 'bar',
+  data: {
+    labels: DATA.products_rev.labels,
+    datasets: [{
+      label: '매출액', data: DATA.products_rev.values,
+      backgroundColor: '#0891b2', borderRadius: 4,
+    }],
+  },
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false },
+      tooltip: { callbacks: { label: ctx => '매출: ' + fmt.money(ctx.parsed.x) } } },
+    scales: { x: { ticks: { callback: v => fmt.moneyK(v) } } },
+  },
+});
+
+// ---- RFM segment colors ----
+const segColors = {
+  'Champions': '#16a34a',
+  'Loyal Customers': '#2563eb',
+  'New Customers': '#0891b2',
+  'At Risk': '#d97706',
+  'About to Sleep': '#dc2626',
+};
+
+// ---- 9) Segment Pie ----
+new Chart(document.getElementById('segPie'), {
+  type: 'doughnut',
+  data: {
+    labels: DATA.rfm_segments.labels,
+    datasets: [{
+      data: DATA.rfm_segments.count,
+      backgroundColor: DATA.rfm_segments.labels.map(l => segColors[l] || '#94a3b8'),
+    }],
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'right' },
+      tooltip: { callbacks: { label: ctx => {
+        const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+        return `${ctx.label}: ${fmt.int(ctx.parsed)}명 (${((ctx.parsed / total) * 100).toFixed(1)}%)`;
+      } } },
+    },
+  },
+});
+
+// ---- 10) Segment Revenue Bar ----
+new Chart(document.getElementById('segRev'), {
+  type: 'bar',
+  data: {
+    labels: DATA.rfm_segments.labels,
+    datasets: [{
+      label: '총 매출', data: DATA.rfm_segments.monetary,
+      backgroundColor: DATA.rfm_segments.labels.map(l => segColors[l] || '#94a3b8'),
+      borderRadius: 4,
+    }],
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false },
+      tooltip: { callbacks: { label: ctx => fmt.money(ctx.parsed.y) } } },
+    scales: { y: { ticks: { callback: v => fmt.moneyK(v) } } },
+  },
+});
+
+// ---- Segment Table ----
+const segs = DATA.rfm_segments;
+let segRows = '<tr><th>세그먼트</th><th class="num">고객 수</th><th class="num">평균 Recency(일)</th><th class="num">평균 Frequency</th><th class="num">평균 Monetary</th><th class="num">총 매출</th></tr>';
+segs.labels.forEach((seg, i) => {
+  segRows += `<tr>
+    <td><span class="badge" style="background:${segColors[seg]}22;color:${segColors[seg]}">${seg}</span></td>
+    <td class="num">${fmt.int(segs.count[i])}</td>
+    <td class="num">${segs.avg_recency[i]}</td>
+    <td class="num">${segs.avg_frequency[i]}</td>
+    <td class="num">${fmt.money(segs.avg_monetary[i])}</td>
+    <td class="num">${fmt.money(segs.monetary[i])}</td>
+  </tr>`;
+});
+document.getElementById('segTable').innerHTML = segRows;
+
+// ---- 11) RFM Scatter ----
+const scatterData = {};
+DATA.rfm_scatter.forEach(p => {
+  if (!scatterData[p.s]) scatterData[p.s] = [];
+  scatterData[p.s].push({ x: p.f, y: Math.max(0.01, p.m) });
+});
+new Chart(document.getElementById('rfmScatter'), {
+  type: 'scatter',
+  data: {
+    datasets: Object.keys(scatterData).map(seg => ({
+      label: seg,
+      data: scatterData[seg],
+      backgroundColor: (segColors[seg] || '#94a3b8') + 'aa',
+      borderColor: segColors[seg] || '#94a3b8',
+      pointRadius: 3,
+    })),
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      tooltip: { callbacks: { label: ctx => `Freq: ${ctx.parsed.x}, Monetary: ${fmt.money(ctx.parsed.y)}` } },
+    },
+    scales: {
+      x: { title: { display: true, text: 'Frequency (구매 횟수)' }, type: 'logarithmic' },
+      y: { title: { display: true, text: 'Monetary (USD, 로그 스케일)' }, type: 'logarithmic',
+        ticks: { callback: v => fmt.moneyK(v) } },
+    },
+  },
+});
+
+// ---- 12) Cohort Heatmap (matrix chart) ----
+const cohort = DATA.cohort;
+let cohortChart = null;
+
+function buildCohortChart(mode) {
+  if (cohortChart) cohortChart.destroy();
+  const matrix = [];
+  cohort.months.forEach((m, yi) => {
+    cohort.indices.forEach((idx, xi) => {
+      const v = (mode === 'rate' ? cohort.retention[yi][xi] : cohort.counts[yi][xi]);
+      if (v != null) matrix.push({ x: idx, y: m, v });
+    });
+  });
+  const maxV = mode === 'rate' ? 1 : Math.max(...matrix.map(d => d.v));
+  cohortChart = new Chart(document.getElementById('cohortHeat'), {
+    type: 'matrix',
+    data: {
+      datasets: [{
+        label: mode === 'rate' ? '리텐션 비율' : '고객 수',
+        data: matrix,
+        backgroundColor: ctx => {
+          const v = ctx.raw.v;
+          const ratio = mode === 'rate' ? v : (v / maxV);
+          const alpha = 0.15 + Math.min(1, ratio) * 0.8;
+          const rgb = mode === 'rate' ? '37, 99, 235' : '22, 163, 74';
+          return `rgba(${rgb}, ${alpha})`;
+        },
+        borderColor: '#fff',
+        borderWidth: 1,
+        width: ({ chart }) => (chart.chartArea || {}).width / cohort.indices.length - 2,
+        height: ({ chart }) => (chart.chartArea || {}).height / cohort.months.length - 2,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: items => `Cohort ${items[0].raw.y} · +${items[0].raw.x}개월`,
+            label: ctx => mode === 'rate'
+              ? `리텐션: ${fmt.pct(ctx.raw.v)}`
+              : `고객 수: ${fmt.int(ctx.raw.v)}명`,
+          },
+        },
+      },
+      scales: {
+        x: { type: 'category', labels: cohort.indices.map(String),
+          title: { display: true, text: '경과 개월 수' }, ticks: { autoSkip: false } },
+        y: { type: 'category', labels: cohort.months, reverse: true,
+          title: { display: true, text: '코호트 (첫 구매월)' } },
+      },
+    },
+  });
+}
+buildCohortChart('rate');
+document.getElementById('cohortMode').addEventListener('change', e => buildCohortChart(e.target.value));
+
+// ---- 13) Cohort Size ----
+new Chart(document.getElementById('cohortSize'), {
+  type: 'bar',
+  data: {
+    labels: cohort.months,
+    datasets: [{
+      label: '신규 고객 수',
+      data: cohort.months.map((_, i) => cohort.counts[i][0]),
+      backgroundColor: '#2563eb', borderRadius: 4,
+    }],
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false },
+      tooltip: { callbacks: { label: ctx => fmt.int(ctx.parsed.y) + '명' } } },
+    scales: { y: { ticks: { callback: v => fmt.int(v) } } },
+  },
+});
+</script>
+</body>
+</html>
