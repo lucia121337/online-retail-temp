@@ -228,6 +228,15 @@
         <b>💡 인사이트</b> · 우측 상단(고빈도·고매출)에 위치한 Champions 군집은 VIP 멤버십·사전 구매 혜택 대상. 좌측 하단(저빈도·저매출)의 About to Sleep 군집은 재진입 쿠폰 캠페인이 적합합니다.
       </div>
     </div>
+
+    <div class="card">
+      <h3>RFM 입체 분포 (3D 버블)</h3>
+      <p class="desc">X = Recency(최근 구매 경과일) · Y = Frequency(구매 횟수, 로그) · 버블 크기 = Monetary(매출, USD) · 색 = 세그먼트</p>
+      <div class="chart-wrap tall"><canvas id="rfm3d"></canvas></div>
+      <div class="insight success">
+        <b>🚀 액션</b> · 좌측(낮은 Recency)에 큰 버블이 모일수록 건강한 구조입니다. 우측에 큰 버블이 보인다면 "한때 VIP였던 이탈 위험 고객" — 재구매 유도 우선순위 1순위입니다.
+      </div>
+    </div>
   </section>
 
   <!-- TAB: COHORT -->
@@ -589,6 +598,45 @@ new Chart(document.getElementById('rfmScatter'), {
   },
 });
 
+// ---- 11b) RFM 3D Bubble (X=Recency, Y=Frequency, R=Monetary) ----
+const bubbleBySeg = {};
+const maxMonetary = Math.max(...DATA.rfm_scatter.map(p => p.m));
+DATA.rfm_scatter.forEach(p => {
+  if (!bubbleBySeg[p.s]) bubbleBySeg[p.s] = [];
+  // 버블 반지름: sqrt 스케일로 보정 (Monetary가 워낙 long-tail)
+  const r = 3 + Math.sqrt(p.m / maxMonetary) * 22;
+  bubbleBySeg[p.s].push({ x: p.r, y: Math.max(1, p.f), r, m: p.m });
+});
+new Chart(document.getElementById('rfm3d'), {
+  type: 'bubble',
+  data: {
+    datasets: Object.keys(bubbleBySeg).map(seg => ({
+      label: seg,
+      data: bubbleBySeg[seg],
+      backgroundColor: (segColors[seg] || '#94a3b8') + '55',
+      borderColor: segColors[seg] || '#94a3b8',
+      borderWidth: 1,
+    })),
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top' },
+      tooltip: { callbacks: { label: ctx => {
+        const d = ctx.raw;
+        return `${ctx.dataset.label} · Recency ${d.x}일 · Freq ${d.y}회 · Monetary ${fmt.money(d.m)}`;
+      } } },
+    },
+    scales: {
+      x: { title: { display: true, text: 'Recency (마지막 구매 후 경과 일수)' },
+        reverse: true,
+        ticks: { callback: v => v + '일' } },
+      y: { type: 'logarithmic', title: { display: true, text: 'Frequency (구매 횟수, 로그)' },
+        ticks: { callback: v => fmt.int(v) } },
+    },
+  },
+});
+
 // ---- 12) Cohort Heatmap (matrix chart) ----
 const cohort = DATA.cohort;
 let cohortChart = null;
@@ -599,7 +647,7 @@ function buildCohortChart(mode) {
   cohort.months.forEach((m, yi) => {
     cohort.indices.forEach((idx, xi) => {
       const v = (mode === 'rate' ? cohort.retention[yi][xi] : cohort.counts[yi][xi]);
-      if (v != null) matrix.push({ x: idx, y: m, v });
+      if (v != null) matrix.push({ x: xi, y: yi, v, month: m, idx });
     });
   });
   const maxV = mode === 'rate' ? 1 : Math.max(...matrix.map(d => d.v));
@@ -612,14 +660,22 @@ function buildCohortChart(mode) {
         backgroundColor: ctx => {
           const v = ctx.raw.v;
           const ratio = mode === 'rate' ? v : (v / maxV);
-          const alpha = 0.15 + Math.min(1, ratio) * 0.8;
+          const alpha = 0.18 + Math.min(1, ratio) * 0.78;
           const rgb = mode === 'rate' ? '37, 99, 235' : '22, 163, 74';
           return `rgba(${rgb}, ${alpha})`;
         },
         borderColor: '#fff',
         borderWidth: 1,
-        width: ({ chart }) => (chart.chartArea || {}).width / cohort.indices.length - 2,
-        height: ({ chart }) => (chart.chartArea || {}).height / cohort.months.length - 2,
+        width: ({ chart }) => {
+          const ca = chart.chartArea;
+          if (!ca) return 0;
+          return ca.width / cohort.indices.length - 2;
+        },
+        height: ({ chart }) => {
+          const ca = chart.chartArea;
+          if (!ca) return 0;
+          return ca.height / cohort.months.length - 2;
+        },
       }],
     },
     options: {
@@ -628,7 +684,7 @@ function buildCohortChart(mode) {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            title: items => `Cohort ${items[0].raw.y} · +${items[0].raw.x}개월`,
+            title: items => `Cohort ${items[0].raw.month} · +${items[0].raw.idx}개월`,
             label: ctx => mode === 'rate'
               ? `리텐션: ${fmt.pct(ctx.raw.v)}`
               : `고객 수: ${fmt.int(ctx.raw.v)}명`,
@@ -636,10 +692,31 @@ function buildCohortChart(mode) {
         },
       },
       scales: {
-        x: { type: 'category', labels: cohort.indices.map(String),
-          title: { display: true, text: '경과 개월 수' }, ticks: { autoSkip: false } },
-        y: { type: 'category', labels: cohort.months,
-          title: { display: true, text: '코호트 (첫 구매월)' } },
+        x: {
+          type: 'linear',
+          min: -0.5, max: cohort.indices.length - 0.5,
+          offset: false,
+          title: { display: true, text: '경과 개월 수' },
+          ticks: {
+            stepSize: 1,
+            autoSkip: false,
+            callback: v => (Number.isInteger(v) && v >= 0 && v < cohort.indices.length) ? cohort.indices[v] : '',
+          },
+          grid: { display: false },
+        },
+        y: {
+          type: 'linear',
+          min: -0.5, max: cohort.months.length - 0.5,
+          reverse: true,
+          offset: false,
+          title: { display: true, text: '코호트 (첫 구매월)' },
+          ticks: {
+            stepSize: 1,
+            autoSkip: false,
+            callback: v => (Number.isInteger(v) && v >= 0 && v < cohort.months.length) ? cohort.months[v] : '',
+          },
+          grid: { display: false },
+        },
       },
     },
   });
