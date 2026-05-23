@@ -346,7 +346,7 @@ new Chart(document.getElementById('monthlyChart'), {
       { type: 'bar', label: '주문 건수', data: DATA.monthly.orders,
         backgroundColor: '#c7d2fe', yAxisID: 'y1', borderRadius: 4 },
       { type: 'line', label: '매출액', data: DATA.monthly.revenue,
-        borderColor: '#2563eb', backgroundColor: '#2563eb', tension: 0.35,
+        borderColor: '#2563eb', backgroundColor: '#2563eb', tension: 0,
         yAxisID: 'y', borderWidth: 3, pointRadius: 4 },
     ],
   },
@@ -398,7 +398,7 @@ new Chart(document.getElementById('dowChart'), {
     datasets: [
       { label: '매출액', data: DATA.dow.revenue, backgroundColor: '#16a34a', yAxisID: 'y', borderRadius: 4 },
       { type: 'line', label: '주문 건수', data: DATA.dow.orders,
-        borderColor: '#d97706', backgroundColor: '#d97706', yAxisID: 'y1', tension: 0.3 },
+        borderColor: '#d97706', backgroundColor: '#d97706', yAxisID: 'y1', tension: 0 },
     ],
   },
   options: {
@@ -638,7 +638,7 @@ function buildCohortChart(mode) {
       scales: {
         x: { type: 'category', labels: cohort.indices.map(String),
           title: { display: true, text: '경과 개월 수' }, ticks: { autoSkip: false } },
-        y: { type: 'category', labels: cohort.months, reverse: true,
+        y: { type: 'category', labels: cohort.months,
           title: { display: true, text: '코호트 (첫 구매월)' } },
       },
     },
